@@ -1,4 +1,6 @@
-# $Id: 02errors.t,v 1.9 2003/06/30 20:08:52 david Exp $
+#!perl -w
+
+# $Id: 02errors.t,v 1.11 2003/07/18 14:51:54 david Exp $
 
 use strict;
 use Test::More;
@@ -20,7 +22,7 @@ BEGIN {
 ##############################################################################
 # Get the name of the error log.
 local $| = 1;
-my $logfile = catfile('logs', 'error_log');
+my $logfile = catfile qw(logs error_log);
 
 ##############################################################################
 # Test a bad callback key.

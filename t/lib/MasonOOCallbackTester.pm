@@ -19,6 +19,12 @@ sub complete : Callback(priority => 3) {
     $args->{result} = 'Complete Success';
 }
 
+sub highest : Callback(priority => 0) {
+    my $self = shift;
+    my $args = $self->request_args;
+    $args->{result} = 'Priority ' . $self->priority;
+}
+
 sub meth_key : Callback {
     my $self = shift;
     my $args = $self->request_args;

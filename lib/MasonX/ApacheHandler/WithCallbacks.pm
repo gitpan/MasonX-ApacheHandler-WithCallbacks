@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.51 2003/07/02 01:48:23 david Exp $
+# $Id: WithCallbacks.pm,v 1.54 2003/07/26 16:32:28 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -27,7 +27,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.99';
+$VERSION = '1.00';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -991,6 +991,29 @@ read-only accessor methods of the same name. For example:
 Garth Webb implemented the original callbacks in Bricolage, based on an idea
 he borrowed from Paul Lindner's work with Apache::ASP. My thanks to them both
 for planting this great idea!
+
+=head1 TODO
+
+=over 4
+
+=item *
+
+Change it to a subclass of HTML::Mason::Request. This will require that we
+override that class' C<exec()> method, and that we override C<new()> to call
+C<alter_superclass()> to do the right thing. See MasonX::Request::WithSession
+for an example. Figure out what to do about the redirect() method in
+CallbackHandler.
+
+=item *
+
+Generalize for use with other templating systems. Start with Template Toolkit
+by subclassing Template.pm and overriding its C<process()> method. Do the same
+for HTML::Template by overriding its C<output()> method. Maybe Later add in
+Embperl and Apache::ASP. Will likely have to move the argument processing code
+into an independent namespace. The code for registering callbacks should be
+able to remain largely the same, however.
+
+=back
 
 =head1 BUGS
 

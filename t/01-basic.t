@@ -1,9 +1,10 @@
-# $Id: 01-basic.t,v 1.19 2003/07/02 01:42:23 david Exp $
+#!perl -w
+
+# $Id: 01-basic.t,v 1.21 2003/07/18 14:51:54 david Exp $
 
 use strict;
 use Test::More;
-use File::Spec::Functions qw(catdir catfile);
-use lib 'lib', catdir('t', 'lib');
+use File::Spec::Functions qw(catfile);
 
 ##############################################################################
 # Figure out if an apache configuration was prepared by Makefile.PL.
@@ -21,14 +22,17 @@ BEGIN {
 ##############################################################################
 # Define the test function.
 local $| = 1;
-my $logfile = catfile(qw(logs error_log));
+my $logfile = catfile qw(logs error_log);
 sub run_test {
     my ($test_name, $code, $req, $expect, $headers, $regex) = @_;
     my $res = $req->{method} eq 'POST' ? POST @{$req}{qw(uri content)} :
       GET $req->{uri};
     is( $res->code, $code, "$test_name for $code code" );
-    is( $res->content, $expect, "Check $test_name for '$expect'" )
-      if defined $expect and $expect ne '0';
+    if (defined $expect and $expect ne '0') {
+        my $content = $res->content;
+        $content = '' unless defined $content;
+        is( $content, $expect, "Check $test_name for '$expect'" )
+    }
 
     # Test the headers.
     if ($headers) {
@@ -52,7 +56,9 @@ sub run_test {
 
 # Just make sure it works.
 run_test 'Simple test', 200,
-  { uri => '/test.html?myCallbackTester|simple_cb=1' },
+  { uri    => '/test.html?myCallbackTester|simple_cb=1',
+    method => 'GET'
+  },
   'Success';
 
 # Make sure that POST works.
@@ -109,12 +115,16 @@ run_test 'Image button', 200,
 
 # Make sure an exception get thrown for a non-existant package.
 run_test 'Non-existant exception', 500,
-  { uri => '/test.html?myNoSuchLuck|foo_cb=1' },
+  { uri    => '/test.html?myNoSuchLuck|foo_cb=1',
+    method => 'GET'
+  },
   0, 0, qr/No such callback package 'myNoSuchLuck'/;
 
 # Make sure an exception get thrown for a non-existant callback.
 run_test 'Non-existent callback', 500,
-  { uri => '/test.html?myCallbackTester|foo_cb=1' },
+  { uri => '/test.html?myCallbackTester|foo_cb=1',
+    method => 'GET'
+  },
   0, 0, qr/No callback found for callback key 'myCallbackTester|foo_cb'/;
 
 # Make sure that redirects work.

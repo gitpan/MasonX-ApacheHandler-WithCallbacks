@@ -30,7 +30,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(ah
 use vars qw($VERSION @ISA);
 @ISA = qw(Class::Container);
 
-$VERSION = '0.99';
+$VERSION = '1.00';
 use constant DEFAULT_PRIORITY => 5;
 
 Params::Validate::validation_options
@@ -149,7 +149,8 @@ sub Callback : ATTR(CODE, BEGIN) {
                };
     my %p = Params::Validate::validate(@$data, $spec);
     # Get the priority.
-    my $priority = $p{priority} || $class->DEFAULT_PRIORITY;
+    my $priority = exists $p{priority} ? $p{priority} :
+      $class->DEFAULT_PRIORITY;
     # Store the priority under the code reference.
     $priorities{$coderef} = $priority;
 }
@@ -272,7 +273,8 @@ sub _get_callback {
     my $c = UNIVERSAL::can($class, $meth) or return;
     # Get the priority for this callback. If there's no priority, it's not
     # a callback, so skip it.
-    my $priority = $priorities{$c} or return;
+    return unless defined $priorities{$c};
+    my $priority = $priorities{$c};
     # Reformat the callback code reference.
     my $code = sub { goto $c };
     # Assign the priority, if necessary.

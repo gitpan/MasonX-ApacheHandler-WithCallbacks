@@ -1,8 +1,9 @@
-# $Id: 04conf.t,v 1.6 2003/07/02 01:42:23 david Exp $
+#!perl -w
+
+# $Id: 04conf.t,v 1.8 2003/07/18 14:51:54 david Exp $
 
 use strict;
 use Test::More;
-use File::Spec::Functions qw(catdir);
 
 ##############################################################################
 # Figure out if an apache configuration was prepared by Makefile.PL.

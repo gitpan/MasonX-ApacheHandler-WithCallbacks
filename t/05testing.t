@@ -1,4 +1,6 @@
-# $Id: 05testing.t,v 1.1 2003/06/15 22:36:57 david Exp $
+#!perl -w
+
+# $Id: 05testing.t,v 1.3 2003/07/18 14:51:54 david Exp $
 
 # Set up the Apache package just for our own tests.
 package Apache;
@@ -12,7 +14,7 @@ package main;
 use strict;
 use Test::More tests => 8;
 use File::Spec::Functions qw(catdir);
-use lib 'lib', catdir('t', 'lib');
+use lib 'lib', catdir qw(t lib);
 use MasonX::CallbackTester;
 use MasonCallbackTester;
 use MasonOOCallbackTester;

@@ -10,6 +10,7 @@ t/02errors.t
 t/03objects.t
 t/04conf.t
 t/05testing.t
+t/06pod.t
 t/conf/extra.conf.in
 t/htdocs/dhandler
 t/lib/MasonCallbackTester.pm

@@ -3,7 +3,7 @@ use strict;
 use MasonX::CallbackHandler;
 use Apache::FakeRequest;
 use vars qw($VERSION);
-$VERSION = '0.99';
+$VERSION = '1.00';
 
 # Make sure that Apache::FakeRequest is actuall an Apache class. Should be
 # in mod_perl 1.28, anyway.
@@ -15,7 +15,11 @@ $VERSION = '0.99';
 package MasonX::CallbackTester::Headers;
 sub unset {}
 my $obj = bless {}, __PACKAGE__;
-*Apache::FakeRequest::headers_in = sub { $obj };
+
+{
+    local $^W;
+    *Apache::FakeRequest::headers_in = sub { $obj };
+}
 
 ##############################################################################
 # Fake out the loading of MasonX::ApacheHandler::WithCallbacks.

@@ -1,5 +1,12 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+1.00  Sat Jul 26 16:31:38 2003
+      - Added test to validate all POD with prodding from Andy Lester.
+      - Changed all tests to always run with -w. Fixed some warnings as a
+        result, including one in MasonX::CallbackTester.
+      - Fixed method callbacks with a priority attribute set to 0 (zero) so
+        that they actually have that priority. Patch from Scott Lanning.
+
 0.99  Wed Jul  2 01:51:52 2003
       - More intelligent handling of situations where Apache::Test isn't
         installed before running Makefile.PL (e.g., via CPAN.pm).

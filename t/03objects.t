@@ -1,4 +1,6 @@
-# $Id: 03objects.t,v 1.15 2003/06/30 20:08:52 david Exp $
+#!perl -w
+
+# $Id: 03objects.t,v 1.17 2003/07/03 19:56:57 david Exp $
 
 use strict;
 use Test::More;
@@ -13,7 +15,7 @@ BEGIN {
 
     require Apache::TestRequest;
     Apache::TestRequest->import(qw(GET POST));
-    plan tests => 143;
+    plan tests => 149;
 }
 
 ##############################################################################
@@ -198,6 +200,12 @@ run_test("Check combined request CBs",
          'presto',
          '/attrs');
 
+# Check that priority 0 works properly when set as a method attribute.
+run_test("Check priority 0 attribute",
+         "Test.html?OOTester|highest_cb=1",
+         200,
+         "Priority 0"
+        );
 
 
 ##############################################################################
