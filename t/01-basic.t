@@ -1,6 +1,6 @@
 #!perl -w
 
-# $Id: 01-basic.t,v 1.21 2003/07/18 14:51:54 david Exp $
+# $Id: 01-basic.t,v 1.22 2003/08/07 22:40:19 david Exp $
 
 use strict;
 use Test::More;
@@ -16,7 +16,7 @@ BEGIN {
 
     require Apache::TestRequest;
     Apache::TestRequest->import(qw(GET POST));
-    plan tests => 47;
+    plan tests => 51;
 }
 
 ##############################################################################
@@ -249,13 +249,29 @@ run_test "die in callback", 500,
   },
   0, 0, qr/\[error\]\s+Error thrown by callback: He's dead, Jim/;
 
+# Now try to die in the callback but handle the exception.
+run_test "die in callback", 200,
+  { uri     => '/exception_handler',
+    method  => 'POST',
+    content => ['myCallbackTester|exception_cb' => 0 ]
+  },
+  0, 0, qr/Got "Error thrown by callback: He's dead, Jim/;
+
 # Now throw an exception in the callback.
 run_test "exception in callback", 500,
   { uri     => '/test.html',
     method  => 'POST',
     content => ['myCallbackTester|exception_cb' => 1 ]
   },
-  0, 0,  qr/\[error\]\s+He's dead, Jim/;
+  0, 0, qr/\[error\]\s+He's dead, Jim/;
+
+# Now throw an exception in the callback and handle it.
+run_test "exception in callback", 200,
+  { uri     => '/exception_handler',
+    method  => 'POST',
+    content => ['myCallbackTester|exception_cb' => 1 ]
+  },
+  0, 0, qr/Got "He's dead, Jim/;
 
 # Now make sure that a callback with a value executes.
 run_test "Exec with value", 200,

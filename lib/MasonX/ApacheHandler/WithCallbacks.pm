@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.54 2003/07/26 16:32:28 david Exp $
+# $Id: WithCallbacks.pm,v 1.56 2003/08/08 00:38:32 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -27,7 +27,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '1.00';
+$VERSION = '1.01';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -108,6 +108,13 @@ __PACKAGE__->valid_params
     { type      => Params::Validate::BOOLEAN,
       parse     => 'boolean',
       default   => 1,
+      descr     => 'Execute callbacks with null values'
+    },
+
+    cb_exception_handler =>
+    { type      => Params::Validate::CODEREF,
+      parse     => 'code',
+      default   => sub { HTML::Mason::Exceptions::rethrow_exception(shift) },
       descr     => 'Execute callbacks with null values'
     },
 
@@ -324,16 +331,19 @@ sub request_args {
     if (my $err = $@) {
         my $ref = ref $err;
         unless ($ref) {
-            # Raw error -- create an exception to throw.
-            HTML::Mason::Exception::Callback::Execution->throw
-              ( error => "Error thrown by callback: $err",
-                callback_error => $err );
+            # Raw error -- create an exception and pass it to the exceptoin
+            # handler.
+            $self->{cb_exception_handler}->
+              (HTML::Mason::Exception::Callback::Execution->new
+               ( error => "Error thrown by callback: $err",
+                 callback_error => $err )
+              );
         } elsif (HTML::Mason::Exceptions::isa_mason_exception($err, 'Abort')) {
             # They aborted. Do nothing, prepare_request() will check the
             # request status and do the right thing.
         } else {
-            # Just pass exception objects on up the chain.
-            die $err;
+            # Just pass exception objects to the exception handler.
+            $self->{cb_exception_handler}->($err);
         }
     }
 
@@ -960,7 +970,7 @@ parameter in your F<httpd.conf> file:
 
 =item C<exec_null_cb_values>
 
-Be default, MasonX::ApacheHandler::WithCallbacks will execute all request
+By default, MasonX::ApacheHandler::WithCallbacks will execute all request
 callbacks. However, in many situations it may be desireable to skip any
 callbacks that have no value for the callback field. One can do this by simply
 checking C<< $cbh->value >> in the callback, but if you need to disable the
@@ -974,6 +984,24 @@ C<exec_null_cb_values> parameter in your F<httpd.conf> file:
 
 B<Note:> The default value of this parameter may be changed to false in a
 future release. Feedback welcome.
+
+=item C<cb_exception_handler>
+
+When MasonX::ApacheHandler::WithCallbacks encounters an exception during the
+execution of callbacks, it normally calls
+C<HTML::Mason::Exceptions::rethrow_exception> to handle the exception. But if
+you find that you're thrown your own exceptions in your callbacks, and want to
+handle them differently (say, to handle them and then let the request
+continue), pass the C<cb_exception_handler> parameter a code reference to do
+what you need.
+
+Use the C<MasonCbExceptionHandler> variable to set the C<cb_exception_handler>
+parameter in your F<httpd.conf> file:
+
+  MasonCbExceptionHandler "sub {...}"
+
+B<Note:> This F<httpd.conf> variable is broken in HTML::Mason 1.21 and earlier.
+It will be fixed in version 1.22.
 
 =back
 

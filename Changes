@@ -1,5 +1,10 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+1.01  Fri Aug  8 00:35:20 2003
+      - Added the cb_exception_handler paremter. This paremter takes a code
+        reference as its argument, and when exceptions are thrown by
+        callbacks, they will be passed to this handler.
+
 1.00  Sat Jul 26 16:31:38 2003
       - Added test to validate all POD with prodding from Andy Lester.
       - Changed all tests to always run with -w. Fixed some warnings as a

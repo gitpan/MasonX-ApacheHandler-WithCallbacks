@@ -39,9 +39,11 @@ PerlHandler MasonCallbackTester
 <Location /conf_test>
   SetHandler perl-script
   PerlSetVar MasonDefaultPriority 3
-  PerlSetVar MasonDefaultPkgKey CBFoo
+  PerlSetVar MasonDefaultPkgKey CBFoo   
+#  PerlSetVar MasonCbExceptionHandler "sub {}"
   PerlAddVar MasonCallbacks "{ cb_key  => 'priority', cb => sub { $_[0]->request_args->{result} = $_[0]->priority } }"
   PerlAddVar MasonCallbacks "{ cb_key  => 'pkg_key', cb => sub { $_[0]->request_args->{result} = $_[0]->pkg_key } }"
+  PerlAddVar MasonCallbacks "{ cb_key  => 'die', cb => sub { die 'Ow!' } }"
   PerlAddVar MasonPreCallbacks "sub { my $args = $_[0]->request_args; $args->{result} = uc $args->{result} if $args->{do_upper} }"
   PerlAddVar MasonPostCallbacks "sub { my $args = $_[0]->request_args; $args->{result} = lc $args->{result} if $args->{do_lower} }"
   PerlHandler MasonX::ApacheHandler::WithCallbacks

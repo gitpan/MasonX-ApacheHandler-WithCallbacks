@@ -1,6 +1,6 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.16 2003/07/02 01:42:23 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.17 2003/08/07 22:40:19 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
@@ -175,14 +175,26 @@ my %tests = ( '/bad_key' => sub {
                            cb_key  => 'simple',
                            cb      => \&simple);
                   my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
-                      ( %params,
-                        exec_null_cb_values => 0,
-                        callbacks => [\%c] );
+                    ( %params,
+                      exec_null_cb_values => 0,
+                      callbacks => [\%c] );
                   $ahwc->handle_request(@_);
               },
 
+              '/exception_handler' => sub {
+                  my %c = (%cb_config,
+                           cb_key  => 'exception',
+                           cb      => \&exception);
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
+                    ( %params,
+                      cb_exception_handler => sub {
+                          # Just log the exception.
+                          print STDERR 'Got "', shift->error, "\"\n"
+                      },
+                      callbacks => [\%c] );
+                  $ahwc->handle_request(@_);
+              },
             );
-
 
 #{ cb => $cb,
 #  cb_key => $cb_key,
