@@ -1,10 +1,12 @@
-# $Id: 01-basic.t,v 1.4 2003/01/20 22:14:06 david Exp $
+# $Id: 01-basic.t,v 1.7 2003/02/14 22:43:02 david Exp $
 
 use strict;
-use Test::More tests => 20;
-use File::Spec::Functions qw(catdir);
+use Test::More tests => 25;
+use File::Spec::Functions qw(catdir catfile);
+use File::Copy qw(copy);
 use lib 'lib', catdir('t', 'lib');
 use Apache::test qw(have_httpd);
+use Apache::TestHelper;
 
 ##############################################################################
 # Figure out if an apache configuration was prepared by Makefile.PL.
@@ -16,6 +18,13 @@ unless (-e catdir('t', 'httpd.conf') and -x catdir('t', 'httpd')) {
     # And just exit if there's no apache config.
     exit;
 }
+
+##############################################################################
+# Kill Apache and copy the appropriate .conf for Apache to load.
+local $| = 1;
+kill_httpd(20);
+copy catfile('t', 'basic.conf'), catfile('t', 'test.conf');
+start_httpd();
 
 ##############################################################################
 # Create the hashes that define the test requets.
@@ -70,9 +79,10 @@ my @test_reqs =
     },
 
     # Make sure an exception get thrown for a non-existant callback.
-    { request   => { uri     => '/test.html?myNoSuchLuck|foo_cb=1',
-                   },
-      code      => '500'
+    { request => { uri     => '/test.html?myNoSuchLuck|foo_cb=1',
+                 },
+      code    => '500',
+      regex   => qr/No callback found for callback key 'myNoSuchLuck|foo_cb'/
     },
 
     # Make sure that redirects work.
@@ -185,13 +195,31 @@ my @test_reqs =
                  . 'myCallbackTester|trig_key3_cb3'
     },
 
+    # Now try to die in the callback.
+    { request => { uri     => '/test.html',
+                   method  => 'POST',
+                   content => 'myCallbackTester|exception_cb=0'
+                 },
+      code    => '500',
+      regex   => qr/\[error\]\s+Error thrown by callback: He's dead, Jim/
+    },
+
+    # Now throw an exception in the callback.
+    { request => { uri     => '/test.html',
+                   method  => 'POST',
+                   content => 'myCallbackTester|exception_cb=1'
+                 },
+      code    => '500',
+      regex   => qr/\[error\]\s+He's dead, Jim/
+    },
+
   );
 
 
 ##############################################################################
 # Start up Apache.
-die "Unable to start apache" unless have_httpd;
 ok(1, "Server started");
+my $logfile = catfile('t', 'error_log');
 
 # Now run the tests.
 foreach my $test (@test_reqs) {
@@ -215,6 +243,15 @@ foreach my $test (@test_reqs) {
         while (my ($h, $v) = each %$headers) {
             is( $res->header($h), $v, "Check for '$v' header" );
         }
+    }
+
+    # Scan the log.
+    if (my $regex = $test->{regex}) {
+        open LOG, $logfile or die "Cannot open '$logfile': $!\n";
+        local $/;
+        my $log = <LOG>;
+        close LOG;
+        like( $log, $regex, "Check log" );
     }
 }
 

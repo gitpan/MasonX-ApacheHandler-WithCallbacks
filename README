@@ -1,4 +1,4 @@
-MasonX/ApacheHandler/WithCallbacks version 0.90
+MasonX/ApacheHandler/WithCallbacks version 0.91
 ===============================================
 
 MasonX::ApacheHandler::WithCallbacks subclasses HTML::Mason::ApacheHandler in

@@ -1,9 +1,10 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.7 2003/01/20 22:14:06 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.8 2003/02/14 22:43:02 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
+use HTML::Mason::Exceptions;
 use Apache;
 use Apache::Constants qw(HTTP_OK);
 use constant KEY => 'myCallbackTester';
@@ -88,6 +89,18 @@ sub upperit {
     $args->{result} = uc $args->{result} if $args->{do_upper};
 }
 
+sub exception {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    if ($cbh->value) {
+        # Throw an exception object.
+        HTML::Mason::Exception->throw( error => "He's dead, Jim" );
+    } else {
+        # Just die.
+        die "He's dead, Jim";
+    }
+}
+
 #{ cb => $cb,
 #  cb_key => $cb_key,
 #  priority => $priority,
@@ -166,6 +179,10 @@ my $ah = MasonX::ApacheHandler::WithCallbacks->new
                   { pkg_key => KEY,
                     cb_key  => 'trig_key3',
                     cb      => \&chk_trig_key
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'exception',
+                    cb      => \&exception
                   },
                  ],
     pre_callbacks => [\&upperit],

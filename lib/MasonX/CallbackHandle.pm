@@ -16,7 +16,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(ah
 use vars qw($VERSION @ISA);
 @ISA = qw(Class::Container);
 
-$VERSION = '0.90';
+$VERSION = '0.91';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -329,21 +329,21 @@ exceptions pass through:
       # handle fatal errors...
   }
 
-C<$@> can lose its value quickly, so if you're planning to call C<<
-$cbh->aborted >> more than a few lines after the C<eval>, you should save
+C<$@> can lose its value quickly, so if you're planning to call
+C<< $cbh->aborted >> more than a few lines after the C<eval>, you should save
 C<$@> to a temporary variable and pass it explicitly via the C<$err> argument.
 
 =back
 
 =head1 SEE ALSO
 
-L<MasonX::ApacheHandler::WithCallback|MasonX::ApacheHandler::WithCallback>
+L<MasonX::ApacheHandler::WithCallbacks|MasonX::ApacheHandler::WithCallbacks>
 constructs MasonX::CallbackHandle objects and passes them as the sole
 argument to callback code references.
 
 =head1 AUTHOR
 
-David Wheeler <L<david@wheeler.net|"david@wheeler.net">>
+David Wheeler <david@wheeler.net>
 
 =head1 COPYRIGHT AND LICENSE
 

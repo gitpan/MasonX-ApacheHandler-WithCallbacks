@@ -1,6 +1,15 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
-0.90  - Added new class, MasonX::CallbackHandle. This class represents all
+0.91  Fri Feb 14 22:45:10 2003
+      - Fixed POD typos.
+      - Added note about testing callbacks to documentation.
+      - Altered testing methodology to allow testing of multiple
+        configurations.
+      - Added tests for invalid parameters.
+      - Added tests for error conditions.
+
+0.90  Mon Jan 20 22:22:16 2003
+      - Added new class, MasonX::CallbackHandle. This class represents all
         of the data relevant to the execution of a callback, plus provides
         the utility methods redirect() and abort() that were previously
         provided by MasonX::ApacheHandler::WithCallbacks.

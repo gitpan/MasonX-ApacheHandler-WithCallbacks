@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.21 2003/01/20 22:14:06 david Exp $
+# $Id: WithCallbacks.pm,v 1.26 2003/02/14 22:49:07 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -28,7 +28,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.90';
+$VERSION = '0.91';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -396,6 +396,13 @@ different page. Executing the redirection in a callback eliminates a lot of
 extraneous processing that would otherwise be executed before the redirection,
 creating a snappier response for the user.
 
+=item Testing
+
+Mason components are not easy to test via a testing framework such as
+Test::Harness. Subroutines in modules, on the other hand, are fully
+testable. This means that you can write tests in your application test suite
+to test your callback subroutines.
+
 =back
 
 And if those are enough reasons, then just consider this: Callbacks just I<way
@@ -691,7 +698,7 @@ L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=MasonX-ApacheHandler-WithCallbacks>.
 
 =item *
 
-Add some good real-world examples to the documentation.
+Create object-oriented interface.
 
 =item *
 
@@ -700,11 +707,7 @@ specs to C<new()>.
 
 =item *
 
-Add tests for error conditions.
-
-=item *
-
-Add tests for invalid parameters.
+Add some good real-world examples to the documentation.
 
 =back
 
