@@ -1,7 +1,11 @@
-DocumentRoot TEST comp
-PerlSetVar MasonCompRoot TEST comp
-PerlSetVar MasonDataDir TEST data
-#PerlSetVar MasonDeferStatusCheck 1
+PerlSetVar MasonCompRoot @DocumentRoot@
+PerlSetVar MasonDataDir @ServerRoot@/data
+<Perl>
+  use File::Spec::Functions qw(catdir);
+  use lib catdir '@ServerRoot@', 'lib';
+  use lib catdir '@ServerRoot@', '..', 'blib';
+  use lib catdir '@ServerRoot@', '..', 'lib';
+</Perl>
 PerlModule MasonOOCallbackSetup
 PerlModule MasonCallbackTester
 SetHandler perl-script

@@ -1,23 +1,17 @@
-# $Id: 02errors.t,v 1.5 2003/04/30 05:46:16 david Exp $
+# $Id: 02errors.t,v 1.6 2003/06/17 22:43:04 david Exp $
 
 use strict;
 use Test::More;
-use File::Spec::Functions qw(catdir catfile);
-use lib 'lib', catdir('t', 'lib');
-use Apache::test qw(have_httpd);
+use File::Spec::Functions qw(catfile);
+use Apache::Test qw(have_lwp);
+use Apache::TestRequest qw(GET);
 
-##############################################################################
-# Figure out if an apache configuration was prepared by Makefile.PL.
-if (-e catdir('t', 'httpd.conf') and -x catdir('t', 'httpd')) {
-    plan tests => 12;
-} else {
-    plan skip_all => 'no httpd';
-}
+plan tests => 12, have_lwp;
 
 ##############################################################################
 # Get the name of the error log.
 local $| = 1;
-my $logfile = catfile('t', 'error_log');
+my $logfile = catfile('logs', 'error_log');
 
 ##############################################################################
 # Test a bad callback key.
@@ -62,7 +56,7 @@ run_test('/no_cbs',
 
 sub run_test {
     my ($uri, $regex, $test_name, $code) = @_;
-    my $res = Apache::test->fetch({ uri => $uri });
+    my $res = GET $uri;
     $code ||= 500;
     is( $res->code, $code, "$test_name for $code code" );
     open LOG, $logfile or die "Cannot open '$logfile': $!\n";

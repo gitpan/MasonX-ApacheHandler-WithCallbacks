@@ -1,26 +1,24 @@
-# $Id: 01-basic.t,v 1.13 2003/04/30 06:05:23 david Exp $
+# $Id: 01-basic.t,v 1.14 2003/06/17 22:43:04 david Exp $
 
 use strict;
 use Test::More;
 use File::Spec::Functions qw(catdir catfile);
 use lib 'lib', catdir('t', 'lib');
-use Apache::test qw(have_httpd);
+use Apache::Test qw(have_lwp);
+use Apache::TestRequest qw(GET POST);
 
 ##############################################################################
 # Figure out if an apache configuration was prepared by Makefile.PL.
-if (-e catdir('t', 'httpd.conf') and -x catdir('t', 'httpd')) {
-    plan tests => 41;
-} else {
-    plan skip_all => 'no httpd';
-}
+plan tests => 41, have_lwp;
 
 ##############################################################################
 # Define the test function.
 local $| = 1;
-my $logfile = catfile('t', 'error_log');
+my $logfile = catfile(qw(logs error_log));
 sub run_test {
     my ($test_name, $code, $req, $expect, $headers, $regex) = @_;
-    my $res = Apache::test->fetch($req);
+    my $res = $req->{method} eq 'POST' ? POST @{$req}{qw(uri content)} :
+      GET $req->{uri};
     is( $res->code, $code, "$test_name for $code code" );
     is( $res->content, $expect, "Check $test_name for '$expect'" )
       if $expect;
@@ -54,7 +52,7 @@ run_test 'Simple test', 200,
 run_test 'POST test', 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|simple_cb=1'
+    content => ['myCallbackTester|simple_cb' => 1 ]
   },
   'Success';
 
@@ -62,13 +60,13 @@ run_test 'POST test', 200,
 run_test 'Execution order', 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|priority_cb0=0'
-               . '&myCallbackTester|priority_cb2=2'
-               . '&myCallbackTester|priority_cb9=9'
-               . '&myCallbackTester|priority_cb7=7'
-               . '&myCallbackTester|priority_cb1=1'
-               . '&myCallbackTester|priority_cb4=4'
-               . '&myCallbackTester|priority_cb=def'
+    content => [  'myCallbackTester|priority_cb0' => 0,
+                  'myCallbackTester|priority_cb2' => 2,
+                  'myCallbackTester|priority_cb9' => 9,
+                  'myCallbackTester|priority_cb7' => 7,
+                  'myCallbackTester|priority_cb1' => 1,
+                  'myCallbackTester|priority_cb4' => 4,
+                  'myCallbackTester|priority_cb'  => 'def' ]
   },
   " 0 1 2 4 5 7 9";
 
@@ -76,11 +74,11 @@ run_test 'Execution order', 200,
 run_test 'Array of Values', 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|multi_cb=1'
-               . '&myCallbackTester|multi_cb=1'
-               . '&myCallbackTester|multi_cb=1'
-               . '&myCallbackTester|multi_cb=1'
-               . '&myCallbackTester|multi_cb=1'
+    content => [ 'myCallbackTester|multi_cb' => 1,
+                 'myCallbackTester|multi_cb' => 1,
+                 'myCallbackTester|multi_cb' => 1,
+                 'myCallbackTester|multi_cb' => 1,
+                 'myCallbackTester|multi_cb' => 1 ]
   },
   "5";
 
@@ -88,8 +86,8 @@ run_test 'Array of Values', 200,
 run_test 'Image button', 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|simple_cb.x=18'
-               . 'myCallbackTester|simple_cb.y=24'
+    content => [ 'myCallbackTester|simple_cb.x' => 18,
+                 'myCallbackTester|simple_cb.y' => 24 ]
   },
   "Success";
 
@@ -107,8 +105,8 @@ run_test 'Non-existent callback', 500,
 run_test "Redirects", 302,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|redir_cb=0'
-               . '&myCallbackTester|set_status_ok_cb9=1'
+    content => ['myCallbackTester|redir_cb' => 0,
+                'myCallbackTester|set_status_ok_cb9' => 1 ]
   },
   0, { Location => 'http://example.com/'};
 
@@ -116,8 +114,8 @@ run_test "Redirects", 302,
 run_test "Redirect without abort", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|redir_cb=1'
-               . '&myCallbackTester|set_status_ok_cb9=1'
+    content => ['myCallbackTester|redir_cb' => 1,
+                'myCallbackTester|set_status_ok_cb9' => 1 ]
   };
 
 
@@ -125,8 +123,8 @@ run_test "Redirect without abort", 200,
 run_test 'redirected attribute', 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|redir_cb=1'
-               . '&myCallbackTester|test_redirected_cb9=1'
+    content => ['myCallbackTester|redir_cb' => 1,
+                'myCallbackTester|test_redirected_cb9' => 1 ]
   },
   'yes';
 
@@ -134,7 +132,7 @@ run_test 'redirected attribute', 200,
 run_test "false redirected attribute", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|test_redirected_cb=1'
+    content => ['myCallbackTester|test_redirected_cb' => 1 ]
   },
   'no';
 
@@ -142,7 +140,7 @@ run_test "false redirected attribute", 200,
 run_test "false aborted", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|test_aborted_cb=0'
+    content => ['myCallbackTester|test_aborted_cb' => 0 ]
   },
   'no';
 
@@ -150,7 +148,8 @@ run_test "false aborted", 200,
 run_test "before request callback", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'result=success&do_upper=1'
+    content => [result   => 'success',
+                do_upper => 1 ]
   },
   "SUCCESS";
 
@@ -158,7 +157,8 @@ run_test "before request callback", 200,
 run_test "after request callback", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|simple_cb=1&do_upper=1'
+    content => ['myCallbackTester|simple_cb' => 1,
+                'do_upper'                   => 1]
   },
   "SUCCESS";
 
@@ -166,9 +166,9 @@ run_test "after request callback", 200,
 run_test "priority attribute", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|chk_priority_cb=1'
-               . '&myCallbackTester|chk_priority_cb9=1'
-               . '&myCallbackTester|chk_priority_cb2=1'
+    content => ['myCallbackTester|chk_priority_cb'  => 1,
+                'myCallbackTester|chk_priority_cb9' => 1,
+                'myCallbackTester|chk_priority_cb2' => 1 ]
   },
   "259";
 
@@ -176,9 +176,9 @@ run_test "priority attribute", 200,
 run_test "cb_key attribute", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|cb_key1_cb1=1'
-               . '&myCallbackTester|cb_key2_cb2=1'
-               . '&myCallbackTester|cb_key3_cb3=1'
+    content => ['myCallbackTester|cb_key1_cb1' => 1,
+                'myCallbackTester|cb_key2_cb2' => 1,
+                'myCallbackTester|cb_key3_cb3' => 1 ]
   },
   "cb_key1cb_key2cb_key3";
 
@@ -187,9 +187,9 @@ run_test "cb_key attribute", 200,
 run_test "pkg_key attribute", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester1|pkg_key1_cb1=1'
-               . '&myCallbackTester2|pkg_key2_cb2=1'
-               . '&myCallbackTester3|pkg_key3_cb3=1'
+    content => ['myCallbackTester1|pkg_key1_cb1' => 1,
+                'myCallbackTester2|pkg_key2_cb2' => 1,
+                'myCallbackTester3|pkg_key3_cb3' => 1 ]
   },
   'myCallbackTester1myCallbackTester2myCallbackTester3';
 
@@ -197,9 +197,9 @@ run_test "pkg_key attribute", 200,
 run_test "pkg_key attribute", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester1|class_key1_cb1=1'
-               . '&myCallbackTester2|class_key2_cb2=1'
-               . '&myCallbackTester3|class_key3_cb3=1'
+    content => ['myCallbackTester1|class_key1_cb1' => 1,
+                'myCallbackTester2|class_key2_cb2' => 1,
+                'myCallbackTester3|class_key3_cb3' => 1 ]
   },
   'myCallbackTester1myCallbackTester2myCallbackTester3';
 
@@ -207,9 +207,9 @@ run_test "pkg_key attribute", 200,
 run_test "trigger_key", 200,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|trig_key1_cb1=1'
-               . '&myCallbackTester|trig_key2_cb2=1'
-               . '&myCallbackTester|trig_key3_cb3=1'
+    content => ['myCallbackTester|trig_key1_cb1' => 1,
+                'myCallbackTester|trig_key2_cb2' => 1,
+                'myCallbackTester|trig_key3_cb3' => 1 ]
   },
   'myCallbackTester|trig_key1_cb1'
   . 'myCallbackTester|trig_key2_cb2'
@@ -219,7 +219,7 @@ run_test "trigger_key", 200,
 run_test "die in callback", 500,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|exception_cb=0'
+    content => ['myCallbackTester|exception_cb' => 0 ]
   },
   0, 0, qr/\[error\]\s+Error thrown by callback: He's dead, Jim/;
 
@@ -227,7 +227,7 @@ run_test "die in callback", 500,
 run_test "exception in callback", 500,
   { uri     => '/test.html',
     method  => 'POST',
-    content => 'myCallbackTester|exception_cb=1'
+    content => ['myCallbackTester|exception_cb' => 1 ]
   },
   0, 0,  qr/\[error\]\s+He's dead, Jim/;
 

@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.42 2003/06/15 22:50:44 david Exp $
+# $Id: WithCallbacks.pm,v 1.46 2003/06/17 22:46:19 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -27,7 +27,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.96';
+$VERSION = '0.97';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -333,6 +333,8 @@ sub request_args {
 sub prepare_request {
     my $self = shift;
     my $m = $self->SUPER::prepare_request(@_);
+    # Clean out the redirected attribute for the next request.
+    delete $self->{redirected};
     # Check our own status and return it, if necessary.
     if (ref $m and my $status = delete $self->{_status}) {
         return $status if $status != HTTP_OK;
@@ -491,7 +493,8 @@ creating a snappier response for the user.
 Mason components are not easy to test via a testing framework such as
 Test::Harness. Subroutines in modules, on the other hand, are fully
 testable. This means that you can write tests in your application test suite
-to test your callback subroutines.
+to test your callback subroutines. See
+L<MasonX::CallbackTester|MasonX::CallbackTester> for details.
 
 =back
 
@@ -966,20 +969,6 @@ for planting this great idea!
 Please report all bugs via the CPAN Request Tracker at
 L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=MasonX-ApacheHandler-WithCallbacks>.
 
-=head1 TODO
-
-=over 4
-
-=item *
-
-Add post-Mason execution callbacks?
-
-=item *
-
-Migrate tests from Apache::test to Apache::Test.
-
-=back
-
 =head1 SEE ALSO
 
 L<MasonX::CallbackHandler|MasonX::CallbackHandler> objects get passed as the
@@ -987,6 +976,9 @@ sole argument to all functional callbacks, and offer access to data relevant
 to the callback. MasonX::CallbackHandler also defines the object-oriented
 callback interface, making its documentation a must-read for anyone who wishes
 to create callback classes and methods.
+
+Use L<MasonX::CallbackTester|MasonX::CallbackTester> to test your callback
+packages and classes.
 
 This module works with L<HTML::Mason|HTML::Mason> by subclassing
 L<HTML::Mason::ApacheHandler|HTML::Mason::ApacheHandler>. Inspired by the

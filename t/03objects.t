@@ -1,29 +1,17 @@
-# $Id: 03objects.t,v 1.10 2003/06/15 22:36:57 david Exp $
+# $Id: 03objects.t,v 1.11 2003/06/17 22:43:04 david Exp $
 
 use strict;
 use Test::More;
-use File::Spec::Functions qw(catdir);
-use lib 'lib', catdir('t', 'lib');
-use LWP::UserAgent;
-use Apache::test qw(have_httpd);
+use Apache::Test qw(have_lwp);
+use Apache::TestRequest qw(GET POST);
+
+plan tests => 143, have_lwp;
 
 ##############################################################################
-# Figure out if an apache configuration was prepared by Makefile.PL.
-unless (-e catdir('t', 'httpd.conf') and -x catdir('t', 'httpd')) {
-    # Skip all of the tests.
-    plan skip_all => 'no httpd';
-} elsif ($] < 5.006) {
-    # No OO interface before Perl 5.6. Skip all of the tests and exit.
-    plan skip_all => 'OO interface not supported prior to Perl 5.6.0';
-} else {
-    plan tests => 143;
-}
+# Tell Apache::TestRequest not to redirect requests.
+$Apache::TestRequest::RedirectOK = 0;
 
 ##############################################################################
-# Don't use Apache::test's default UA object because it will try to actually
-# execute redirects when we use GET or HEAD.
-my $ua = LWP::UserAgent->new(requests_redirectable => 0);
-
 run_test("Simple CB",
          'test.html?OOTester|simple_cb=1',
          200,
@@ -211,10 +199,11 @@ run_test("Check combined request CBs",
 sub run_test {
     my ($test_name, $uri, $code, $expect, $dir, $headers) = @_;
     foreach my $loc ($dir ? ($dir) : qw(/oop /empty /ooconf_list)) {
-        my $res = Apache::test->fetch($ua, { uri => "$loc/$uri" });
-        is( $res->code, $code, "$test_name for $code code" );
+        my $res = GET("$loc/$uri");
+        is( $res->code, $code, "$test_name for $code code" )
+          or print diag $res->content;
         is( $res->content, $expect, "Check $test_name for '$expect'" )
-          or diag "$loc/$uri/" if $expect;
+          or diag "$loc/$uri" if $expect;
         # Test the headers.
         if ($headers) {
             while (my ($h, $v) = each %$headers) {

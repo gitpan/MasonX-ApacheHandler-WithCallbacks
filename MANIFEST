@@ -10,9 +10,8 @@ t/02errors.t
 t/03objects.t
 t/04conf.t
 t/05testing.t
-t/comp/dhandler
-t/conf/test.conf
-t/lib/Apache/test.pm
+t/conf/extra.conf.in
+t/htdocs/dhandler
 t/lib/MasonCallbackTester.pm
 t/lib/MasonOOCallbackSetup.pm
 t/lib/MasonOOCallbackTester.pm

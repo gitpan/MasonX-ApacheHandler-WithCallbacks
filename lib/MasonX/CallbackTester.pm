@@ -3,7 +3,7 @@ use strict;
 use MasonX::CallbackHandler;
 use Apache::FakeRequest;
 use vars qw($VERSION);
-$VERSION = '0.96';
+$VERSION = '0.97';
 
 ##############################################################################
 # MasonX::CallbackHandler->redirect needs this.

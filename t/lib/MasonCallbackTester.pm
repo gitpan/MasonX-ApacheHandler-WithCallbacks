@@ -1,6 +1,6 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.13 2003/06/15 22:36:57 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.14 2003/06/17 22:43:04 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
@@ -31,7 +31,8 @@ sub set_status_ok {
 sub test_redirected {
     my $cbh = shift;
     my $args = $cbh->request_args;
-    $args->{result} = $cbh->redirected eq $url ? 'yes' : 'no';
+    $args->{result} = $cbh->redirected && $cbh->redirected eq $url ?
+      'yes' : 'no';
     $cbh->abort(HTTP_OK)
 }
 

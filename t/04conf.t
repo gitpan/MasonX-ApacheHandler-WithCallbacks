@@ -1,27 +1,16 @@
-# $Id: 04conf.t,v 1.1 2003/06/15 22:36:57 david Exp $
+# $Id: 04conf.t,v 1.2 2003/06/17 22:43:04 david Exp $
 
 use strict;
 use Test::More;
 use File::Spec::Functions qw(catdir);
-use lib 'lib', catdir('t', 'lib');
-use LWP::UserAgent;
-use Apache::test qw(have_httpd);
+use Apache::Test qw(have_lwp);
+use Apache::TestRequest qw(GET POST);
 
-##############################################################################
-# Figure out if an apache configuration was prepared by Makefile.PL.
-unless (-e catdir('t', 'httpd.conf') and -x catdir('t', 'httpd')) {
-    # Skip all of the tests.
-    plan skip_all => 'no httpd';
-} elsif ($] < 5.006) {
-    # No OO interface before Perl 5.6. Skip all of the tests and exit.
-    plan skip_all => 'OO interface not supported prior to Perl 5.6.0';
-} else {
-    plan tests => 8;
-}
+plan tests => 8, have_lwp;
 
 sub run_test {
     my ($uri, $test_name, $code, $expect) = @_;
-    my $res = Apache::test->fetch($uri);
+    my $res = GET $uri;
     is( $res->code, $code, "$test_name for $code code" );
     is( $res->content, $expect, "Check $test_name for '$expect'" )
 }
