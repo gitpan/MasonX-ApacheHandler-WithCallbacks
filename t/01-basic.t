@@ -1,7 +1,7 @@
-# $Id: 01-basic.t,v 1.2 2003/01/02 22:40:16 david Exp $
+# $Id: 01-basic.t,v 1.4 2003/01/20 22:14:06 david Exp $
 
 use strict;
-use Test::More tests => 16;
+use Test::More tests => 20;
 use File::Spec::Functions qw(catdir);
 use lib 'lib', catdir('t', 'lib');
 use Apache::test qw(have_httpd);
@@ -141,6 +141,48 @@ my @test_reqs =
                    content => 'myCallbackTester|simple_cb=1&do_upper=1'
                  },
       expect  => "SUCCESS"
+    },
+
+    # Now check the priority attribute of the MasonX::CallbackHandle.
+    { request => { uri     => '/test.html',
+                   method  => 'POST',
+                   content => 'myCallbackTester|chk_priority_cb=1'
+                              . '&myCallbackTester|chk_priority_cb9=1'
+                              . '&myCallbackTester|chk_priority_cb2=1'
+                 },
+      expect  => "259"
+    },
+
+    # Now check the cb_key attribute of the MasonX::CallbackHandle.
+    { request => { uri     => '/test.html',
+                   method  => 'POST',
+                   content => 'myCallbackTester|cb_key1_cb1=1'
+                              . '&myCallbackTester|cb_key2_cb2=1'
+                              . '&myCallbackTester|cb_key3_cb3=1'
+                 },
+      expect  => "cb_key1cb_key2cb_key3"
+    },
+
+    # Now check the pkg_key attribute of the MasonX::CallbackHandle.
+    { request => { uri     => '/test.html',
+                   method  => 'POST',
+                   content => 'myCallbackTester1|pkg_key1_cb1=1'
+                              . '&myCallbackTester2|pkg_key2_cb2=1'
+                              . '&myCallbackTester3|pkg_key3_cb3=1'
+                 },
+      expect  => 'myCallbackTester1myCallbackTester2myCallbackTester3',
+    },
+
+    # Now check the trigger_key attribute of the MasonX::CallbackHandle.
+    { request => { uri     => '/test.html',
+                   method  => 'POST',
+                   content => 'myCallbackTester|trig_key1_cb1=1'
+                              . '&myCallbackTester|trig_key2_cb2=1'
+                              . '&myCallbackTester|trig_key3_cb3=1'
+                 },
+      expect  => 'myCallbackTester|trig_key1_cb1'
+                 . 'myCallbackTester|trig_key2_cb2'
+                 . 'myCallbackTester|trig_key3_cb3'
     },
 
   );

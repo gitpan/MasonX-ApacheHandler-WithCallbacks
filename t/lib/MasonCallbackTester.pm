@@ -1,6 +1,6 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.4 2003/01/16 07:10:51 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.7 2003/01/20 22:14:06 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
@@ -9,13 +9,15 @@ use Apache::Constants qw(HTTP_OK);
 use constant KEY => 'myCallbackTester';
 
 sub simple {
-    my ($cbh, $args, $val, $key) = @_;
+    my $cbh = shift;
+    my $args = $cbh->request_args;
     $args->{result} = 'Success';
 }
 
 my $url = 'http://example.com/';
 sub redir {
-    my ($cbh, $args, $val, $key) = @_;
+    my $cbh = shift;
+    my $val = $cbh->value;
     $cbh->redirect($url, $val);
 }
 
@@ -26,31 +28,63 @@ sub set_status_ok {
 }
 
 sub test_redirected {
-    my ($cbh, $args, $val, $key) = @_;
+    my $cbh = shift;
+    my $args = $cbh->request_args;
     $args->{result} = $cbh->redirected eq $url ? 'yes' : 'no';
     $cbh->abort(HTTP_OK)
 }
 
 sub test_aborted {
-    my ($cbh, $args, $val, $key) = @_;
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    my $val = $cbh->value;
     eval { $cbh->abort(500)} if $val;
     $args->{result} = $cbh->aborted($@) ? 'yes' : 'no';
     $cbh->abort(HTTP_OK)
 }
 
 sub priority {
-    my ($cbh, $args, $val, $key) = @_;
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    my $val = $cbh->value;
     $val = '5' if $val eq 'def';
     $args->{result} .= " $val";
 }
 
+sub chk_priority {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    $args->{result} .= $cbh->priority;
+}
+
+sub chk_cb_key {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    $args->{result} .= $cbh->cb_key;
+}
+
+sub chk_pkg_key {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    $args->{result} .= $cbh->pkg_key;
+}
+
+sub chk_trig_key {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    $args->{result} .= $cbh->trigger_key;
+}
+
 sub multi {
-    my ($cbh, $args, $val, $key) = @_;
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    my $val = $cbh->value;
     $args->{result} = scalar @$val;
 }
 
 sub upperit {
-    my ($cbh, $args) = @_;
+    my $cbh = shift;
+    my $args = $cbh->request_args;
     $args->{result} = uc $args->{result} if $args->{do_upper};
 }
 
@@ -92,6 +126,46 @@ my $ah = MasonX::ApacheHandler::WithCallbacks->new
                   { pkg_key => KEY,
                     cb_key  => 'multi',
                     cb      => \&multi
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'chk_priority',
+                    cb      => \&chk_priority
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'cb_key1',
+                    cb      => \&chk_cb_key
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'cb_key2',
+                    cb      => \&chk_cb_key
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'cb_key3',
+                    cb      => \&chk_cb_key
+                  },
+                  { pkg_key => KEY . '1',
+                    cb_key  => 'pkg_key1',
+                    cb      => \&chk_pkg_key
+                  },
+                  { pkg_key => KEY . '2',
+                    cb_key  => 'pkg_key2',
+                    cb      => \&chk_pkg_key
+                  },
+                  { pkg_key => KEY . '3',
+                    cb_key  => 'pkg_key3',
+                    cb      => \&chk_pkg_key
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'trig_key1',
+                    cb      => \&chk_trig_key
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'trig_key2',
+                    cb      => \&chk_trig_key
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'trig_key3',
+                    cb      => \&chk_trig_key
                   },
                  ],
     pre_callbacks => [\&upperit],

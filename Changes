@@ -1,5 +1,21 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+0.90  - Added new class, MasonX::CallbackHandle. This class represents all
+        of the data relevant to the execution of a callback, plus provides
+        the utility methods redirect() and abort() that were previously
+        provided by MasonX::ApacheHandler::WithCallbacks.
+      - Changed callback code reference interface so that instead of taking a
+        list of relevant arguments, it takes a single argument: an
+        instantiation of the new MasonX::CallbackHandle class. This will allow
+        new data and methods to be provided without having to change the
+        interface for callbacks again.
+      - Removed ToDo item about putting callbacks in a hash instead of an
+        array. I benchmarked it, and found that in most cases, the array will
+        be faster, even if only two of its indices are used. So callback will
+        stay in an array indexed by priority.
+      - Incremented version number to 0.90 because I think that this new
+        interface will remain pretty stable.
+
 0.12  Thu Jan 16 18:12:18 2003
       - Fixed redirection to actually redirect before Mason creates its
         component stack and executes components. Thanks to Garth Webb

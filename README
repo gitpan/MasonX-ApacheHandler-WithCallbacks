@@ -1,12 +1,12 @@
-MasonX/ApacheHandler/WithCallbacks version 0.12
+MasonX/ApacheHandler/WithCallbacks version 0.90
 ===============================================
 
 MasonX::ApacheHandler::WithCallbacks subclasses HTML::Mason::ApacheHandler in
 order to provide callbacks. Callbacks are code references provided to the
 new() constructor, and are triggered either for every request or by specially
 named keys in the Mason request arguments. The callbacks are executed at the
-beginning of a request, just before Mason creates a component stack and
-executes the components.
+beginning of a request, just before Mason creates and executes the request
+component stack.
 
 The idea is to configure Mason to execute arbitrary code before executing any
 components. Doing so allows you to carry out logical processing of data
@@ -27,8 +27,8 @@ DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-  HTML::Mason 1.10
-  mod_perl 1.22
+  HTML::Mason 1.10 or later
+  mod_perl 1.22 or later
 
 COPYRIGHT AND LICENCE
 
