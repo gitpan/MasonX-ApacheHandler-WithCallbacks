@@ -30,7 +30,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(ah
 use vars qw($VERSION @ISA);
 @ISA = qw(Class::Container);
 
-$VERSION = '0.95';
+$VERSION = '0.96';
 use constant DEFAULT_PRIORITY => 5;
 
 Params::Validate::validation_options
@@ -185,12 +185,12 @@ sub PostCallback : ATTR(CODE, BEGIN) {
 # but mod_perl ignores them. So the solution is to have the callback methods
 # save the code references for the methods, make sure that
 # MasonX::ApacheHandler::WithCallbacks is loaded _after_ all the classes that
-# inherit from MasonX::CallbackHandler, and have it call thismethod to go back
-# and find the names of the callback methods. The method names will then of
-# course be used for the callback names. In mod_perl2, we'll likely be able to
-# call this method from a PerlPostConfigHandler instead of making
+# inherit from MasonX::CallbackHandler, and have it call this method to go
+# back and find the names of the callback methods. The method names will then
+# of course be used for the callback names. In mod_perl2, we'll likely be able
+# to call this method from a PerlPostConfigHandler instead of making
 # ApacheHandler::WithCallbacks do it, thus relieving the enforced loading
-#  order.
+# order.
 # http://perl.apache.org/docs/2.0/user/handlers/server.html#PerlPostConfigHandler
 
 sub _find_names {
@@ -358,7 +358,7 @@ __END__
 
 =head1 NAME
 
-MasonX::CallbackHandler - Callback Request Data and Utility Methods
+MasonX::CallbackHandler - Mason callback request class and OO callback base class
 
 =head1 SYNOPSIS
 
@@ -744,7 +744,7 @@ and override the C<build_utc_date()> method to do what you need:
   use base qw(MyApp::CallbackHandler);
   use strict;
 
-  __PACKAGE__->register_instance;
+  __PACKAGE__->register_subclass;
 
   # Implement CLASS_KEY ourselves.
   use constant CLASS_KEY => 'SubHandler';
@@ -783,7 +783,7 @@ actually encoded using the Perl C<\x{..}> notation. Again, just subclass:
   use base qw(MasonX::CallbackHandler::Unicodify);
   use strict;
 
-  __PACKAGE__->register_instance( class_key => 'PerlEncode' );
+  __PACKAGE__->register_subclass( class_key => 'PerlEncode' );
 
   sub unicodify : PreCallback {
       my $self = shift;
@@ -833,7 +833,7 @@ so that each of your callback methods doesn't have to:
   sub new {
       my $class = shift;
       my $self = $class->SUPER::new(@_);
-      my $args = $self->requst_args;
+      my $args = $self->request_args;
       $self->object($args->{class}->lookup( id => $args->{obj_id} ));
   }
 

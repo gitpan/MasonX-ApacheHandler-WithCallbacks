@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.37 2003/05/01 05:34:00 david Exp $
+# $Id: WithCallbacks.pm,v 1.42 2003/06/15 22:50:44 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -27,10 +27,33 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.95';
+$VERSION = '0.96';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
+
+# We'll use this code reference for cb_classes parameter validation.
+my $valid_cb_classes = sub {
+    # Just return true if they use the string "ALL".
+    return 1 if $_[0] eq 'ALL';
+    # Return false if it isn't an array.
+    return unless ref $_[0] || '' eq 'ARRAY';
+    # Return true if the first value isn't the string "_ALL_";
+    return 1 if $_[0]->[0] ne '_ALL_';
+    # Return false if there's more than one element in the array.
+    return if @{$_[0]} > 1;
+    # Change the value from an array to "ALL"!
+    $_[0] = 'ALL';
+    return 1;
+};
+
+# We'll use this code reference to eval arguments passed in via httpd.conf
+# PerlSetVar directives.
+my $eval_directive = { convert => sub {
+    return 1 if ref $_[0]->[0];
+    for (@{$_[0]}) { $_ = eval $_ }
+    return 1;
+}};
 
 __PACKAGE__->valid_params
   ( default_priority =>
@@ -53,6 +76,7 @@ __PACKAGE__->valid_params
     { type      => Params::Validate::ARRAYREF,
       parse     => 'list',
       optional  => 1,
+      callbacks => $eval_directive,
       descr     => 'Callback specifications'
     },
 
@@ -60,6 +84,7 @@ __PACKAGE__->valid_params
     { type      => Params::Validate::ARRAYREF,
       parse     => 'list',
       optional  => 1,
+      callbacks => $eval_directive,
       descr     => 'Callbacks to be executed before argument callbacks'
     },
 
@@ -67,15 +92,14 @@ __PACKAGE__->valid_params
     { type      => Params::Validate::ARRAYREF,
       parse     => 'list',
       optional  => 1,
+      callbacks => $eval_directive,
       descr     => 'Callbacks to be executed after argument callbacks'
     },
 
     cb_classes =>
     { type      => Params::Validate::ARRAYREF | Params::Validate::SCALAR,
       parse     => 'list',
-      callbacks => { 'valid cb_classes' => sub { ref $_[0] eq 'ARRAY'
-                                                   || $_[0] eq 'ALL' }
-                   },
+      callbacks => { 'valid cb_classes' => $valid_cb_classes },
       optional  => 1,
       descr     => 'List of calback classes from which to load callbacks'
     },
@@ -161,8 +185,8 @@ sub new {
             or $Apache::Server::Starting) {
         require Carp;
         Carp::carp("You didn't specify any callbacks. If you're not going " .
-          "to use callbacks,\nyou might as well just use " .
-          "HTML::Mason::ApacheHandler.\n");
+          "to use callbacks, you might as well just use " .
+          "HTML::Mason::ApacheHandler.");
     }
 
     # Let 'em have it.
@@ -323,34 +347,19 @@ __END__
 
 =head1 NAME
 
-MasonX::ApacheHandler::WithCallbacks - Functional and object-oriented Mason
-callback architecture
+MasonX::ApacheHandler::WithCallbacks - Functional and object-oriented Mason callback architecture
 
 =head1 SYNOPSIS
-
-=begin comment
-
-In F<httpd.conf>:
-
-  PerlModule My::Callbacker
-  # Must load last:
-  PerlModule MasonX::ApacheHandler::WithCallbacks
-  <Location /mason>
-    SetHandler perl-script
-    PerlHandler MasonX::ApacheHandler::WithCallbacks
-  </Location>
-
-=end comment
 
 In your Mason component:
 
   % if (exists $ARGS{answer}) {
-        <p><b>Answer: <% $ARGS{answer} %></b></p>
+  <p><b>Answer: <% $ARGS{answer} %></b></p>
   % } else {
   <form>
-  <p>Enter an epoch time: <input type="text" name="epoch_time" /><br />
-  <input type="submit" name="myCallbacker|calc_time_cb" value="Calculate" />
-  </p>
+    <p>Enter an epoch time: <input type="text" name="epoch_time" /><br />
+      <input type="submit" name="myCallbacker|calc_time_cb" value="Calculate" />
+    </p>
   </form>
   % }
 
@@ -367,7 +376,7 @@ In F<handler.pl>:
   }
 
   my $ah = MasonX::ApacheHandler::WithCallbacks->new
-    ( callbacks => [ { cb_key  => calc_time,
+    ( callbacks => [ { cb_key  => 'calc_time',
                        pkg_key => 'myCallbacker',
                        cb      => \&calc_time } ]
     );
@@ -486,8 +495,8 @@ to test your callback subroutines.
 
 =back
 
-And if those aren't enough reasons, then just consider this: Callbacks just
-I<way cool.>
+And if those aren't enough reasons, then just consider this: Callbacks are
+just I<way cool.>
 
 =head1 USAGE
 
@@ -621,7 +630,7 @@ like so:
   package MyApp::CallbackHandler;
   use base qw(MasonX::CallbackHandler);
   __PACKAGE__->register_subclass;
-  use constant class_key => 'MyCBHandler';
+  use constant CLASS_KEY => 'MyCBHandler';
 
 If no class key is explicitly defined, MasonX::CallbackHandler will use the
 subclass name, instead. In any event, the C<register_callback()> method
@@ -777,7 +786,16 @@ HTML::Mason::Exception::Callback::Execution exception will be thrown.
 
 In addition to those offered by the HTML::Mason::ApacheHandler base class,
 this module supports a number of its own parameters to the C<new()>
-constructor.
+constructor. Each also has a corresponding F<httpd.conf> variable, as well,
+so, if you really want to, you can use MasonX::ApacheHandler::WithCallbacks
+right in your F<httpd.conf> file:
+
+  PerlModule MasonX::ApacheHandler::WithCallbacks
+  SetHandler perl-script
+  PerlHandler MasonX::ApacheHandler::WithCallbacks
+
+The parameters to C<new()> and their corresponding F<httpd.conf> variables are
+as follows:
 
 =over 4
 
@@ -821,6 +839,18 @@ functional callbacks may be set via the C<default_priority> parameter.
 
 =back
 
+The <callbacks> parameter can also be specified via the F<httpd.conf>
+configuration variable C<MasonCallbacks>. Use C<PerlSetVar> to specify
+several callbacks; each one should be an C<eval>able string that converts into
+a hash reference as specified here. For example, to specify two callbacks, use
+this syntax:
+
+  PerlAddVar MasonCallbacks "{ cb_key  => 'foo', cb => sub { ... }"
+  PerlAddVar MasonCallbacks "{ cb_key  => 'bar', cb => sub { ... }"
+
+Note that the C<eval>able string must be entirely on its own line in the
+F<httpd.conf> file.
+
 =item C<pre_callbacks>
 
 This parameter accepts an array reference of code references that should be
@@ -832,6 +862,14 @@ functional callbacks in a single request. Use pre-argument-triggered request
 callbacks when you want to do something with the arguments submitted for every
 request, such as convert character sets.
 
+The <pre_callbacks> parameter can also be specified via the F<httpd.conf>
+configuration variable C<MasonPreCallbacks>. Use multiple C<PerlAddVar> to
+add multiple pre-request callbacks; each one should be an C<eval>able string
+that converts into a code reference:
+
+  PerlAddVar MasonPreCallbacks "sub { ... }"
+  PerlAddVar MasonPreCallbacks "sub { ... }"
+
 =item C<post_callbacks>
 
 This parameter accepts an array reference of code references that should be
@@ -842,6 +880,14 @@ argument. The same instance of a MasonX::CallbackHandler object will be used
 for all functional callbacks in a single request. Use post-argument-triggered
 request callbacks when you want to do something with the arguments submitted
 for every request, such as HTML-escape their values.
+
+The <post_callbacks> parameter can also be specified via the F<httpd.conf>
+configuration variable C<MasonPostCallbacks>. Use multiple C<PerlAddVar> to
+add multiple post-request callbacks; each one should be an C<eval>able string
+that converts into a code reference:
+
+  PerlAddVar MasonPostCallbacks "sub { ... }"
+  PerlAddVar MasonPostCallbacks "sub { ... }"
 
 =item C<cb_classes>
 
@@ -858,6 +904,19 @@ B<Note:> Be sure to C<use MasonX::ApacheHandler::WithCallbacks> I<only> after
 you've C<use>d all of the MasonX::CallbackHandler subclasses you need or else
 you won't be able to use their callback methods.
 
+The <cb_classes> parameter can also be specified via the F<httpd.conf>
+configuration variable C<MasonCbClasses>. Use multiple C<PerlAddVar> to add
+multiple callback class keys. But, again, be sure to load
+MasonX::ApacheHandler::WithCallbacks> I<only> after you've loaded all of your
+MasonX::Callback handler subclasses:
+
+  PerlModule My::CBClass
+  PerlModule Your::CBClass
+  PerlSetVar MasonCbClasses myCBClass
+  PerlAddVar MasonCbClasses yourCBClass
+  # Load MasonX::ApacheHandler::WithCallbacks last!
+  PerlModule MasonX::ApacheHandler::WithCallbacks
+
 =item C<default_priority>
 
 The priority level at which functional callbacks will be executed. Does not
@@ -867,6 +926,11 @@ C<priority> key. You may specify a default priority level within the range of
 "0" (highest priority) to "9" (lowest priority). If not specified, it defaults
 to "5".
 
+Use the C<MasonDefaultPriority> variable to set the the C<default_priority>
+parameter in your F<httpd.conf> file:
+
+  PerlSetVar MasonDefaultPriority 3
+
 =item C<default_pkg_key>
 
 The default package key for functional callbacks. Does not apply to
@@ -874,6 +938,11 @@ object-oriented callbacks. This value that will be used in each hash reference
 passed via the C<callbacks> parameter to C<new()> that lacks a C<pkg_key>
 key. It can be any string that evaluates to a true value, and defaults to
 "DEFAULT" if not specified.
+
+Use the C<MasonDefaultPkgKey> variable to set the the C<default_pkg_key>
+parameter in your F<httpd.conf> file:
+
+  PerlSetVar MasonDefaultPkgKey CBFoo
 
 =back
 
@@ -903,17 +972,11 @@ L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=MasonX-ApacheHandler-WithCallbacks>.
 
 =item *
 
-Figure out how to use F<httpd.conf> C<PerlSetVar> directives to pass callback
-specs to C<new()>.
-
-=item *
-
-Add explicit support for testing -- perhaps by adding a fake class of some
-kind that does something different with C<redirect()> and C<abort()>?
-
-=item *
-
 Add post-Mason execution callbacks?
+
+=item *
+
+Migrate tests from Apache::test to Apache::Test.
 
 =back
 

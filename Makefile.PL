@@ -1,8 +1,9 @@
 use ExtUtils::MakeMaker;
-use Apache::test;
 use FindBin;
-use File::Spec::Functions qw(catdir catfile);
 use File::Path;
+use File::Spec::Functions qw(catdir catfile);
+use lib 'lib', catdir('t', 'lib');
+use Apache::test;
 
 if (my %params = Apache::test->get_test_params) {
     # We can use apache to test the module during "make test".

@@ -1,6 +1,6 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.12 2003/04/30 06:05:23 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.13 2003/06/15 22:36:57 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
@@ -122,40 +122,45 @@ my %cb_config = ( pkg_key => KEY,
 my %tests = ( '/bad_key' => sub {
                   my %c = %cb_config;
                   $c{cb_key} = ''; # Ooops.
-                  MasonX::ApacheHandler::WithCallbacks->new
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
                       ( %params, callbacks => [\%c] );
+                  $ahwc->handle_request(@_);
               },
 
               '/bad_priority' => sub {
                   my %c = %cb_config;
                   $c{priority} = 'foo'; # Ooops.
-                  MasonX::ApacheHandler::WithCallbacks->new
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
                       ( %params, callbacks => [\%c] );
+                  $ahwc->handle_request(@_);
               },
 
               '/bad_coderef' => sub {
                   my %c = %cb_config;
                   $c{cb_key} = 'coderef';
                   $c{cb} = 'bogus'; # Ooops.
-                  MasonX::ApacheHandler::WithCallbacks->new
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
                       ( %params, callbacks => [\%c] );
+                  $ahwc->handle_request(@_);
               },
 
               '/used_key' => sub {
                   my %c = my %b = %cb_config;
                   $c{cb_key} = $b{cb_key} = 'my_key'; # Ooops.
-                  MasonX::ApacheHandler::WithCallbacks->new
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
                       ( %params, callbacks => [\%c, \%b] );
+                  $ahwc->handle_request(@_);
               },
 
               '/global_coderef' => sub {
-                  MasonX::ApacheHandler::WithCallbacks->new
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new
                       ( %params, pre_callbacks => ['foo'] );
+                  $ahwc->handle_request(@_);
               },
 
               '/no_cbs' => sub {
-                  MasonX::ApacheHandler::WithCallbacks->new
-                      ( %params );
+                  my $ahwc = MasonX::ApacheHandler::WithCallbacks->new( %params );
+                  $ahwc->handle_request(@_);
               },
             );
 

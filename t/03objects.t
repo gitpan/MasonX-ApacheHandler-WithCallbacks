@@ -1,4 +1,4 @@
-# $Id: 03objects.t,v 1.9 2003/05/01 05:38:37 david Exp $
+# $Id: 03objects.t,v 1.10 2003/06/15 22:36:57 david Exp $
 
 use strict;
 use Test::More;
@@ -16,7 +16,7 @@ unless (-e catdir('t', 'httpd.conf') and -x catdir('t', 'httpd')) {
     # No OO interface before Perl 5.6. Skip all of the tests and exit.
     plan skip_all => 'OO interface not supported prior to Perl 5.6.0';
 } else {
-    plan tests => 96;
+    plan tests => 143;
 }
 
 ##############################################################################
@@ -166,11 +166,13 @@ run_test("Same object",
 # Check that cb_classes => 'ALL' worked properly by checking for callbacks
 # in each of the callback classes.
 foreach my $ckey (qw(OOTester OOTesterSub Empty ReqSub)) {
-    run_test("Check 'ALL'",
-             "test.html?$ckey|simple_cb=1",
-             200,
-             'Simple Success',
-             '/all');
+    foreach my $dir (qw(/all /ooconf_test)) {
+        run_test("Check 'ALL'",
+                 "test.html?$ckey|simple_cb=1",
+                 200,
+                 'Simple Success',
+                 $dir);
+    }
 }
 
 # Make sure that when request callbacks are called that there are no values
@@ -188,7 +190,7 @@ run_test("Check functional CB in combined",
          'Success',
          '/attrs');
 
-# Now try the OO meethod.
+# Now try the OO method.
 run_test("Check functional CB in combined",
          "test.html?OOTester|simple_cb=1",
          200,
@@ -208,11 +210,11 @@ run_test("Check combined request CBs",
 ##############################################################################
 sub run_test {
     my ($test_name, $uri, $code, $expect, $dir, $headers) = @_;
-    foreach my $loc ($dir ? ($dir) : qw(/oop /empty)) {
+    foreach my $loc ($dir ? ($dir) : qw(/oop /empty /ooconf_list)) {
         my $res = Apache::test->fetch($ua, { uri => "$loc/$uri" });
         is( $res->code, $code, "$test_name for $code code" );
         is( $res->content, $expect, "Check $test_name for '$expect'" )
-          if $expect;
+          or diag "$loc/$uri/" if $expect;
         # Test the headers.
         if ($headers) {
             while (my ($h, $v) = each %$headers) {

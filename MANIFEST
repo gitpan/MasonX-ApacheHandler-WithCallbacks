@@ -4,9 +4,12 @@ Makefile.PL
 README
 lib/MasonX/ApacheHandler/WithCallbacks.pm
 lib/MasonX/CallbackHandler.pm
+lib/MasonX/CallbackTester.pm
 t/01-basic.t
 t/02errors.t
 t/03objects.t
+t/04conf.t
+t/05testing.t
 t/comp/dhandler
 t/conf/test.conf
 t/lib/Apache/test.pm

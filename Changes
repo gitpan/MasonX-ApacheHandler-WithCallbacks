@@ -1,5 +1,21 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+0.96  Sun Jun 15 22:52:25 2003
+      - Minor documentation corrections.
+      - Changed documentation to refer to the register_subclass() method
+        instead of the nonexistent register_instance() method, thanks to
+        Scott Lanning.
+      - Fixed failing test in t/02errors.t. Not sure how it ever passed
+        before.
+      - Added support for "MasonCbClasses" httpd.conf directive. Use "_ALL"
+        instead of "ALL" to register the callback methods of all of the
+        MasonX::CallbackHandler subclasses.
+      - Added support for httpd.conf directives for all of the parameters to
+        MasonX::ApacheHandler::WithCallbacks->new.
+      - Added MasonX::CallbackHandlerTest to simplify testing callback
+        packages and classes outside of a mod_perl environment (i.e., in
+        standard Test::Harness test suites).
+
 0.95  Thu May  1 05:36:38 2003
       - Changed MasonX::CallbackHandle to MasonX::CallbackHandler to
         reflect its job as a subclassable callback handler.
@@ -9,6 +25,8 @@ Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
         which are themselves identified by attributes. This is a much bigger
         addition than it sounds like here. Read the MasonX::CallbackHandler
         documentation for all the details.
+      - Changed the callback execution so that the same callback class objects
+        are passed to all of the relevant callbacks for a single request.
       - Many spelling errors corrected thanks to Scott Lanning.
 
 0.91  Fri Feb 14 22:45:10 2003
