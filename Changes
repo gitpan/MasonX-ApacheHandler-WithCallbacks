@@ -1,7 +1,10 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+1.10  Mon Sep 15 21:39:52 2003
+      - Deleted. Use MasonX::Interp::WithCallbacks, instead.
+
 1.01  Fri Aug  8 00:35:20 2003
-      - Added the cb_exception_handler paremter. This paremter takes a code
+      - Added the cb_exception_handler parameter. This parameter takes a code
         reference as its argument, and when exceptions are thrown by
         callbacks, they will be passed to this handler.
 

@@ -1,0 +1,11 @@
+--- #YAML:1.0
+name: MasonX-ApacheHandler-WithCallbacks
+version: 1.10
+license: perl
+distribution_type: module
+requires: {}
+recommends: {}
+build_requires: {}
+conflicts: {}
+provides: {}
+generated_by: Module::Build version 0.20

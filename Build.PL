@@ -1,4 +1,4 @@
-use ExtUtils::MakeMaker;
+use Module::Build;
 
 warn <<"DELETION_WARN";
 
@@ -12,6 +12,7 @@ available on BackPAN.
 
 DELETION_WARN
 
-WriteMakefile(
-    NAME    => 'MasonX::ApacheHandler::WithCallbacks',
-    VERSION => '1.10');
+Module::Build->new( module_name  => 'MasonX::ApacheHandler::WithCallbacks',
+                    dist_version => '1.10',
+                    license      => 'perl',
+                  )->create_build_script;
