@@ -1,5 +1,13 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+0.11
+      - Removed some extraneous code.
+      - Changed abort() to set $r->status to the aborted value.
+      - Fixed mis-named exception classes. Thanks to Garth Webb for the spot.
+      - Made the pre_callbacks and post_callbacks arguments optional. Thanks
+        to Garth Webb for the spot.
+      - Fixed a few minor POD nits.
+
 0.10  Thu Jan  2 22:43:13 2003
       - Initial Public Release.
 

@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.4 2003/01/03 06:43:25 david Exp $
+# $Id: WithCallbacks.pm,v 1.14 2003/01/13 17:39:57 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -28,7 +28,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -59,12 +59,14 @@ __PACKAGE__->valid_params
     pre_callbacks =>
     { type      => Params::Validate::ARRAYREF,
       parse     => 'list',
+      optional  => 1,
       descr     => 'Callbacks to be executed before argument callbacks'
     },
 
     post_callbacks =>
     { type      => Params::Validate::ARRAYREF,
       parse     => 'list',
+      optional  => 1,
       descr     => 'Callbacks to be executed after argument callbacks'
     },
 
@@ -80,13 +82,13 @@ sub new {
             $spec->{pkg_key} ||= $self->{default_pkg_key};
 
             # Make sure that we have a callback key.
-            HTML::Mason::Exceptions::Params->throw
+            HTML::Mason::Exception::Params->throw
               ( error => "Missing or invalid callback key" )
                 unless $spec->{cb_key};
 
             # Make sure that we have a valid priority.
             if (defined $spec->{priority}) {
-                HTML::Mason::Exceptions::Params->throw
+                HTML::Mason::Exception::Params->throw
                   ( error => "Not a valid priority: '$spec->{priority}'" )
                   unless $spec->{priority} =~ /^\d$/;
             } else {
@@ -95,13 +97,13 @@ sub new {
             }
 
             # Make sure that we have a code reference.
-            HTML::Mason::Exceptions::Params->throw
+            HTML::Mason::Exception::Params->throw
               ( error => "Callback for package key '$spec->{pkg_key}' and " .
                          "callback key '$spec->{cb_key}' not a code reference"
               ) unless ref $spec->{cb} eq 'CODE';
 
             # Make sure that the key isn't already in use.
-            HTML::Mason::Exceptions::Params->throw
+            HTML::Mason::Exception::Params->throw
               ( error => "Callback key '$spec->{cb_key}' already used by " .
                 "package key '$spec->{pkg_key}'"
               ) if $cbs{$spec->{pkg_key}}->{$spec->{cb_key}};
@@ -119,7 +121,7 @@ sub new {
             my @gcbs;
             foreach my $cb (@$cbs) {
                 # Make sure that we have a code reference.
-                HTML::Mason::Exceptions::Params->throw
+                HTML::Mason::Exception::Params->throw
                   ( error => "Global $type callback not a code reference" )
                   unless ref $cb eq 'CODE';
                 push @gcbs, [$cb];
@@ -138,6 +140,20 @@ sub request_args {
     my ($args, $r, $q) = $self->SUPER::request_args(@_);
     $self->{apache_req} = $r;
 
+    # Use an array to store the callbacks according to their priorities. Why
+    # an array when most of its indices will be undefined? Well, because I
+    # benchmarked it vs. a hash, and found a very negligible difference when
+    # the array had only element five filled (with no 6-9 elements) and the
+    # hash had only one element. Furthermore, in all cases where the array had
+    # two elements (with the other 8 undef), it outperformed the two-element
+    # hash every time. But really this just starts to come down to very fine
+    # differences compared to the work that the callbacks will likely be
+    # doing, anyway. And in the meantime, the array is just easier to use,
+    # since the priorities are just numbers, and its easist to unshift and
+    # push on the pre- and post- request callbacks than to stick them onto a
+    # hash. In short, the use of arrays is cleaner, easier to read and
+    # maintain, and almost always just as fast or faster than using hashes. So
+    # that's the way it'll be.
     my @cbs;
     if ($self->{_cbs}) {
         while (my ($k, $v) = each %$args) {
@@ -187,7 +203,7 @@ sub request_args {
 
     # Now execute the callbacks.
     eval {
-      RUNCBS: foreach my $cb_list (@cbs) {
+        foreach my $cb_list (@cbs) {
             # Skip it if there are no callbacks for this priority.
             next unless $cb_list;
             foreach my $cb_data (@$cb_list) {
@@ -233,6 +249,7 @@ sub redirect {
 
 sub abort {
     my ($self, $aborted_value) = @_;
+    $self->apache_req->status($aborted_value);
     $self->{aborted} = 1;
     HTML::Mason::Exception::Abort->throw
         ( error => __PACKAGE__ . '->abort was called',
@@ -241,7 +258,7 @@ sub abort {
 
 sub aborted {
     my ($self, $err) = @_;
-    $err = $@ unless defined($err);
+    $err = $@ unless defined $err;
     return HTML::Mason::Exceptions::isa_mason_exception( $err, 'Abort' );
 }
 
@@ -423,7 +440,7 @@ The arguments are as follows:
 
 =over 4
 
-=item <$cbh>
+=item C<$cbh>
 
 The first argument is the MasonX::ApacheHandler::WithCallbacks object
 itself. Use its C<redirect()> method to redirect the request to a new URL or
@@ -671,7 +688,7 @@ and defaults to "DEFAULT" if not specified.
 
 =back
 
-=head2 ACCESSOR METHODS
+=head2 Accessor Methods
 
 The properties C<default_priority> and C<default_pkg_key> have standard
 read-only accessor methods of the same name. For example:
@@ -680,7 +697,7 @@ read-only accessor methods of the same name. For example:
   my $default_priority = $cbh->default_priority;
   my $default_pkg_key = $cbh->default_pkg_key;
 
-=head2 OTHER METHODS
+=head2 Other Methods
 
 The ApacheHandler::WithCallbacks object has a few other publicly accessible
 methods.
@@ -774,13 +791,6 @@ C<$@> to a temporary variable.
 
 =back
 
-=head1 SEE ALSO
-
-This module works with L<HTML::Mason|HTML::Mason> by subclassing
-L<HTML::Mason::ApacheHandler|HTML::Mason::ApacheHandler>. It is based on the
-implementation of callbacks in Bricolage (L<http://bricolage.cc/>), though is
-a completely new code base with a different approach.
-
 =head1 ACKNOWLEDGEMENTS
 
 Garth Webb implemented the original callbacks in Bricolage, based on an idea
@@ -812,6 +822,11 @@ specs to C<new()>.
 
 =item *
 
+Maybe change C<request_args()> to store callbacks in a hash instead of an
+array?
+
+=item *
+
 Add tests for multiple packages supplying callbacks.
 
 =item *
@@ -823,6 +838,13 @@ Add tests for error conditions.
 Add tests for invalid parameters.
 
 =back
+
+=head1 SEE ALSO
+
+This module works with L<HTML::Mason|HTML::Mason> by subclassing
+L<HTML::Mason::ApacheHandler|HTML::Mason::ApacheHandler>. Inspired by the
+implementation of callbacks in Bricolage (L<http://bricolage.cc/>), it is
+however a completely new code base with a rather different approach.
 
 =head1 AUTHOR
 
