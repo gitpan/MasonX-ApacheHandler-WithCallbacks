@@ -1,5 +1,7 @@
 package MasonCallbackTester;
 
+# $Id: MasonCallbackTester.pm,v 1.4 2003/01/16 07:10:51 david Exp $
+
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
 use Apache;
@@ -19,18 +21,21 @@ sub redir {
 
 sub set_status_ok {
     my $cbh = shift;
-    $cbh->apache_req->status(HTTP_OK)
+    $cbh->apache_req->status(HTTP_OK);
+    $cbh->abort(HTTP_OK)
 }
 
 sub test_redirected {
     my ($cbh, $args, $val, $key) = @_;
     $args->{result} = $cbh->redirected eq $url ? 'yes' : 'no';
+    $cbh->abort(HTTP_OK)
 }
 
 sub test_aborted {
     my ($cbh, $args, $val, $key) = @_;
     eval { $cbh->abort(500)} if $val;
     $args->{result} = $cbh->aborted($@) ? 'yes' : 'no';
+    $cbh->abort(HTTP_OK)
 }
 
 sub priority {

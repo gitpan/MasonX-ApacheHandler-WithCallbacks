@@ -1,12 +1,12 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.14 2003/01/13 17:39:57 david Exp $
+# $Id: WithCallbacks.pm,v 1.16 2003/01/16 07:10:51 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
 use HTML::Mason::ApacheHandler ();
 use HTML::Mason::Exceptions ();
-use Apache::Constants qw(REDIRECT);
+use Apache::Constants qw(REDIRECT HTTP_OK);
 use Params::Validate ();
 
 use Exception::Class ( 'HTML::Mason::Exception::Callback::InvalidKey' =>
@@ -28,7 +28,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.11';
+$VERSION = '0.12';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -223,7 +223,7 @@ sub request_args {
                 ( error => "Error thrown by callback: $err",
                   callback_error => $err );
         } elsif ($self->aborted($err)) {
-            # They aborted. Do nothing, since Mason will check the
+            # They aborted. Do nothing, prepare_request() will check the
             # request status and do the right thing.
         } else {
             # Just die.
@@ -235,6 +235,15 @@ sub request_args {
     return ($args, $r, $q);
 }
 
+sub prepare_request {
+    my $self = shift;
+    my $m = $self->SUPER::prepare_request(@_);
+    if (my $status = delete $self->{_status}) {
+        return $status if $status != HTTP_OK;
+    }
+    return $m;
+}
+
 sub redirect {
     my ($self, $url, $wait, $status) = @_;
     $status ||= REDIRECT;
@@ -242,14 +251,14 @@ sub redirect {
     $r->method('GET');
     $r->headers_in->unset('Content-length');
     $r->err_header_out( Location => $url );
-    $r->status($status);
+    $self->{_status} = $status;
     $self->{redirected} = $url;
     $self->abort($status) unless $wait;
 }
 
 sub abort {
     my ($self, $aborted_value) = @_;
-    $self->apache_req->status($aborted_value);
+    $self->{_status} = $aborted_value;
     $self->{aborted} = 1;
     HTML::Mason::Exception::Abort->throw
         ( error => __PACKAGE__ . '->abort was called',

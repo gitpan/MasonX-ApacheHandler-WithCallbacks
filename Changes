@@ -1,6 +1,11 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
-0.11
+0.12  Thu Jan 16 18:12:18 2003
+      - Fixed redirection to actually redirect before Mason creates its
+        component stack and executes components. Thanks to Garth Webb
+        for the spot.
+
+0.11  Mon Jan 13 18:32:10 2003
       - Removed some extraneous code.
       - Changed abort() to set $r->status to the aborted value.
       - Fixed mis-named exception classes. Thanks to Garth Webb for the spot.
