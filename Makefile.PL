@@ -2,12 +2,20 @@ use ExtUtils::MakeMaker;
 use FindBin;
 use File::Path;
 use File::Spec::Functions qw(catdir catfile);
-use Apache::TestMM qw(test clean);
-use Apache::TestRunPerl;
+use constant HAS_APACHE_TEST => eval {require Apache::Test};
 
-Apache::TestMM::filter_args();
-Apache::TestRunPerl->generate_script();
-make_data_dir();
+# Set up the test suite.
+if (HAS_APACHE_TEST) {
+    require Apache::TestMM;
+    require Apache::TestRunPerl;
+    Apache::TestMM->import(qw(test clean));
+    Apache::TestMM::filter_args();
+    Apache::TestRunPerl->generate_script();
+    make_data_dir();
+} else {
+    print "Skipping test setup.\n";
+}
+
 
 my $clean = join ' ', map { catfile('t', $_) }
   qw(data TEST logs);
@@ -19,8 +27,9 @@ WriteMakefile(
     'VERSION_FROM'	=> 'lib/MasonX/ApacheHandler/WithCallbacks.pm',
     'PREREQ_PM'		=> { HTML::Mason  => '1.10',
                              Apache::Test => '1.03',
+                             Test::Simple => '0.17',
                              mod_perl     => '1.22' },
-    'clean'             => { FILES => $clean },
+       'clean'             => { FILES => $clean },
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'lib/MasonX/ApacheHandler/WithCallbacks.pm',
        AUTHOR     => 'David Wheeler <david@wheeler.net>') : ()),

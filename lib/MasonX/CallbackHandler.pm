@@ -30,7 +30,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(ah
 use vars qw($VERSION @ISA);
 @ISA = qw(Class::Container);
 
-$VERSION = '0.98';
+$VERSION = '0.99';
 use constant DEFAULT_PRIORITY => 5;
 
 Params::Validate::validation_options

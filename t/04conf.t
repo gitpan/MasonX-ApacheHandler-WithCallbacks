@@ -1,12 +1,21 @@
-# $Id: 04conf.t,v 1.2 2003/06/17 22:43:04 david Exp $
+# $Id: 04conf.t,v 1.6 2003/07/02 01:42:23 david Exp $
 
 use strict;
 use Test::More;
 use File::Spec::Functions qw(catdir);
-use Apache::Test qw(have_lwp);
-use Apache::TestRequest qw(GET POST);
 
-plan tests => 8, have_lwp;
+##############################################################################
+# Figure out if an apache configuration was prepared by Makefile.PL.
+BEGIN {
+    plan skip_all => 'Apache::Test required to run tests'
+      unless eval {require Apache::Test};
+    plan skip_all => 'libwww-perl is not installed'
+      unless Apache::Test::have_lwp();
+
+    require Apache::TestRequest;
+    Apache::TestRequest->import(qw(GET POST));
+    plan tests => 12;
+}
 
 sub run_test {
     my ($uri, $test_name, $code, $expect) = @_;
@@ -38,3 +47,15 @@ run_test '/conf_test/test.html?result=SUCCESS&do_lower=1',
   "Test MasonPreCallback",
   200,
   'success';
+
+# Test MasonExecNullCbValues.
+run_test '/no_exec_conf/test.html?CBFoo|exec_cb=1',
+  "Test MasonMasonExecNullCbValues with a value",
+  200,
+  'executed';
+
+# Test MasonExecNullCbValues again.
+run_test '/no_exec_conf/test.html?CBFoo|exec_cb=',
+  "Test MasonMasonExecNullCbValues with no value",
+  200,
+  '';

@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.48 2003/06/29 20:20:59 david Exp $
+# $Id: WithCallbacks.pm,v 1.51 2003/07/02 01:48:23 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -27,7 +27,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.98';
+$VERSION = '0.99';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -102,6 +102,13 @@ __PACKAGE__->valid_params
       callbacks => { 'valid cb_classes' => $valid_cb_classes },
       optional  => 1,
       descr     => 'List of calback classes from which to load callbacks'
+    },
+
+    exec_null_cb_values =>
+    { type      => Params::Validate::BOOLEAN,
+      parse     => 'boolean',
+      default   => 1,
+      descr     => 'Execute callbacks with null values'
     },
 
   );
@@ -219,6 +226,10 @@ sub request_args {
             if ((my $key = $chk) =~ s/_cb(\d?)$//) {
                 # It's a callback field. Grab the priority.
                 my $priority = $1;
+
+                # Skip callbacks without values, if necessary.
+                next unless $self->{exec_null_cb_values} ||
+                  (defined $args->{$k} && $args->{$k} ne '');
 
                 if ($chk ne $k) {
                     # Some browsers will submit $k.x and $k.y instead of just
@@ -946,6 +957,23 @@ Use the C<MasonDefaultPkgKey> variable to set the the C<default_pkg_key>
 parameter in your F<httpd.conf> file:
 
   PerlSetVar MasonDefaultPkgKey CBFoo
+
+=item C<exec_null_cb_values>
+
+Be default, MasonX::ApacheHandler::WithCallbacks will execute all request
+callbacks. However, in many situations it may be desireable to skip any
+callbacks that have no value for the callback field. One can do this by simply
+checking C<< $cbh->value >> in the callback, but if you need to disable the
+execution of all callbacks, pass the C<exec_null_cb_value> parameter with a
+false value. It is set to a true value by default.
+
+Use the C<MasonExecNullCbValues> variable to set the the
+C<exec_null_cb_values> parameter in your F<httpd.conf> file:
+
+  PerlSetVar MasonExecNullCbValues 0
+
+B<Note:> The default value of this parameter may be changed to false in a
+future release. Feedback welcome.
 
 =back
 

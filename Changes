@@ -1,5 +1,14 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+0.99  Wed Jul  2 01:51:52 2003
+      - More intelligent handling of situations where Apache::Test isn't
+        installed before running Makefile.PL (e.g., via CPAN.pm).
+      - Added the exec_null_cb_values parameter. Set it to a false value to
+        prevent request callbacks without a value from executing. NOTE: The
+        current default for this parameter is true, but may be changed in
+        a future release. Pass it explicitly to avoid the possibility of
+        this change.
+
 0.98  Sun Jun 29 20:23:34 2003
       - Eliminated declaration of package Apache::FakeRequest, so as not to
         annoy the CPAN indexer.

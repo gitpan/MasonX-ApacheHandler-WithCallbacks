@@ -1,15 +1,22 @@
-# $Id: 01-basic.t,v 1.15 2003/06/29 20:20:59 david Exp $
+# $Id: 01-basic.t,v 1.19 2003/07/02 01:42:23 david Exp $
 
 use strict;
 use Test::More;
 use File::Spec::Functions qw(catdir catfile);
 use lib 'lib', catdir('t', 'lib');
-use Apache::Test qw(have_lwp);
-use Apache::TestRequest qw(GET POST);
 
 ##############################################################################
 # Figure out if an apache configuration was prepared by Makefile.PL.
-plan tests => 43, have_lwp;
+BEGIN {
+    plan skip_all => 'Apache::Test required to run tests'
+      unless eval {require Apache::Test};
+    plan skip_all => 'libwww-perl is not installed'
+      unless Apache::Test::have_lwp();
+
+    require Apache::TestRequest;
+    Apache::TestRequest->import(qw(GET POST));
+    plan tests => 47;
+}
 
 ##############################################################################
 # Define the test function.
@@ -21,7 +28,7 @@ sub run_test {
       GET $req->{uri};
     is( $res->code, $code, "$test_name for $code code" );
     is( $res->content, $expect, "Check $test_name for '$expect'" )
-      if $expect;
+      if defined $expect and $expect ne '0';
 
     # Test the headers.
     if ($headers) {
@@ -239,5 +246,22 @@ run_test "exception in callback", 500,
     content => ['myCallbackTester|exception_cb' => 1 ]
   },
   0, 0,  qr/\[error\]\s+He's dead, Jim/;
+
+# Now make sure that a callback with a value executes.
+run_test "Exec with value", 200,
+  { uri     => '/no_null',
+    method  => 'POST',
+    content => ['myCallbackTester|simple_cb' => 1 ]
+  },
+  'Success';
+
+# Now make sure that a callback with a value does not execute.
+run_test "Exec with value", 200,
+  { uri     => '/no_null',
+    method  => 'POST',
+    content => ['myCallbackTester|simple_cb' => '' ]
+  },
+  '';
+
 
 __END__

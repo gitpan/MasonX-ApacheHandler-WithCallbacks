@@ -3,7 +3,7 @@ use strict;
 use MasonX::CallbackHandler;
 use Apache::FakeRequest;
 use vars qw($VERSION);
-$VERSION = '0.98';
+$VERSION = '0.99';
 
 # Make sure that Apache::FakeRequest is actuall an Apache class. Should be
 # in mod_perl 1.28, anyway.

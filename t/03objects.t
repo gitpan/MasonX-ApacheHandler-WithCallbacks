@@ -1,11 +1,20 @@
-# $Id: 03objects.t,v 1.12 2003/06/18 20:47:06 david Exp $
+# $Id: 03objects.t,v 1.15 2003/06/30 20:08:52 david Exp $
 
 use strict;
 use Test::More;
-use Apache::Test qw(have_lwp);
-use Apache::TestRequest qw(GET POST);
 
-plan tests => 143, have_lwp;
+##############################################################################
+# Figure out if an apache configuration was prepared by Makefile.PL.
+BEGIN {
+    plan skip_all => 'Apache::Test required to run tests'
+      unless eval {require Apache::Test};
+    plan skip_all => 'libwww-perl is not installed'
+      unless Apache::Test::have_lwp();
+
+    require Apache::TestRequest;
+    Apache::TestRequest->import(qw(GET POST));
+    plan tests => 143;
+}
 
 ##############################################################################
 run_test("Simple CB",

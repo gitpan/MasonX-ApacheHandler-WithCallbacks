@@ -46,3 +46,10 @@ PerlHandler MasonCallbackTester
   PerlAddVar MasonPostCallbacks "sub { my $args = $_[0]->request_args; $args->{result} = lc $args->{result} if $args->{do_lower} }"
   PerlHandler MasonX::ApacheHandler::WithCallbacks
 </Location>
+<Location /no_exec_conf>
+  SetHandler perl-script
+  PerlSetVar MasonDefaultPkgKey CBFoo
+  PerlSetVar MasonExecNullCbValues 0
+  PerlAddVar MasonCallbacks "{ cb_key  => 'exec', cb => sub { $_[0]->request_args->{result} = 'executed' } }"
+  PerlHandler MasonX::ApacheHandler::WithCallbacks
+</Location>

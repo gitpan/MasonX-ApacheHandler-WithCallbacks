@@ -1,4 +1,4 @@
-MasonX/ApacheHandler/WithCallbacks version 0.98
+MasonX/ApacheHandler/WithCallbacks version 0.99
 ===============================================
 
 MasonX::ApacheHandler::WithCallbacks subclasses HTML::Mason::ApacheHandler in
@@ -25,6 +25,10 @@ To install this module type the following:
    make test
    make install
 
+Note that if you run `make test`, you will need a working Apache/mod_perl
+server. Set the $APACHE or $APXS environment variable to point to your
+Apache/mod_perl server.
+
 DEPENDENCIES
 
 This module requires these other modules and libraries:
@@ -37,6 +41,11 @@ these other modules and libraries:
 
   Attribute::Handlers 0.77 or later
   Clas::ISA
+
+The test suite requires the following modules:
+
+  Apache::Test 1.03 or later
+  Test::Simple 0.17 or later
 
 COPYRIGHT AND LICENCE
 
