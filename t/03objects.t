@@ -1,4 +1,4 @@
-# $Id: 03objects.t,v 1.11 2003/06/17 22:43:04 david Exp $
+# $Id: 03objects.t,v 1.12 2003/06/18 20:47:06 david Exp $
 
 use strict;
 use Test::More;
@@ -6,10 +6,6 @@ use Apache::Test qw(have_lwp);
 use Apache::TestRequest qw(GET POST);
 
 plan tests => 143, have_lwp;
-
-##############################################################################
-# Tell Apache::TestRequest not to redirect requests.
-$Apache::TestRequest::RedirectOK = 0;
 
 ##############################################################################
 run_test("Simple CB",
@@ -199,7 +195,7 @@ run_test("Check combined request CBs",
 sub run_test {
     my ($test_name, $uri, $code, $expect, $dir, $headers) = @_;
     foreach my $loc ($dir ? ($dir) : qw(/oop /empty /ooconf_list)) {
-        my $res = GET("$loc/$uri");
+        my $res = GET "$loc/$uri", redirect_ok => 0;
         is( $res->code, $code, "$test_name for $code code" )
           or print diag $res->content;
         is( $res->content, $expect, "Check $test_name for '$expect'" )

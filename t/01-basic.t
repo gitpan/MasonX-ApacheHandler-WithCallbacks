@@ -1,4 +1,4 @@
-# $Id: 01-basic.t,v 1.14 2003/06/17 22:43:04 david Exp $
+# $Id: 01-basic.t,v 1.15 2003/06/29 20:20:59 david Exp $
 
 use strict;
 use Test::More;
@@ -9,7 +9,7 @@ use Apache::TestRequest qw(GET POST);
 
 ##############################################################################
 # Figure out if an apache configuration was prepared by Makefile.PL.
-plan tests => 41, have_lwp;
+plan tests => 43, have_lwp;
 
 ##############################################################################
 # Define the test function.
@@ -90,6 +90,15 @@ run_test 'Image button', 200,
                  'myCallbackTester|simple_cb.y' => 24 ]
   },
   "Success";
+
+# Make sure that an image submit doesn't cause the callback to be called twice.
+run_test 'Image button', 200,
+  { uri     => '/test.html',
+    method  => 'POST',
+    content => [ 'myCallbackTester|count_cb.x' => 18,
+                 'myCallbackTester|count_cb.y' => 24 ]
+  },
+  "1";
 
 # Make sure an exception get thrown for a non-existant package.
 run_test 'Non-existant exception', 500,

@@ -3,23 +3,25 @@ use strict;
 use MasonX::CallbackHandler;
 use Apache::FakeRequest;
 use vars qw($VERSION);
-$VERSION = '0.97';
+$VERSION = '0.98';
+
+# Make sure that Apache::FakeRequest is actuall an Apache class. Should be
+# in mod_perl 1.28, anyway.
+@Apache::FakeRequest::ISA = qw(Apache) unless @Apache::FakeRequest::ISA;
 
 ##############################################################################
-# MasonX::CallbackHandler->redirect needs this.
-package Apache::FakeRequestHeaders;
+# MasonX::CallbackHandler->redirect needs to call unset() on an object
+# returned by $apache_req->headers_in().
+package MasonX::CallbackTester::Headers;
 sub unset {}
-
-##############################################################################
-package Apache::FakeRequest;
-@Apache::FakeRequest::ISA = qw(Apache);
-# Again, used by MasonX::CallbackHandler->redirect.
-sub headers_in { bless {}, 'Apache::FakeRequestHeaders' }
+my $obj = bless {}, __PACKAGE__;
+*Apache::FakeRequest::headers_in = sub { $obj };
 
 ##############################################################################
 # Fake out the loading of MasonX::ApacheHandler::WithCallbacks.
 package MasonX::ApacheHandler::WithCallbacks;
-$MasonX::ApacheHandler::WithCallbacks::VERSION = '0.96';
+$MasonX::ApacheHandler::WithCallbacks::VERSION =
+  $MasonX::CallbackTester::VERSION;
 use File::Spec::Functions qw(catfile);
 BEGIN {
     # Is this legal?

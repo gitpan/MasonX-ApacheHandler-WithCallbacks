@@ -1,5 +1,14 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+0.98  Sun Jun 29 20:23:34 2003
+      - Eliminated declaration of package Apache::FakeRequest, so as not to
+        annoy the CPAN indexer.
+      - Smarter prevention of redirects in tests.
+      - Require Apache::Test 1.03 or later, since that version fixes issues on
+        case-insensitive file systems.
+      - Fixed processing of callback parameters so that image submits won't
+        cause a callback to be called twice. Patch from Scott Lanning.
+
 0.97  Tue Jun 17 22:56:51 2003
       - Ported test suite to Apache::Test.
       - The redirected attribute of the MasonX::ApacheHandler::WithCallbacks

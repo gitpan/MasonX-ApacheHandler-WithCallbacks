@@ -1,6 +1,6 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.14 2003/06/17 22:43:04 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.15 2003/06/29 20:20:59 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
@@ -106,6 +106,12 @@ sub exception {
         # Just die.
         die "He's dead, Jim";
     }
+}
+
+sub count {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    $args->{result}++;
 }
 
 my $server = Apache->server;
@@ -257,6 +263,10 @@ my $ah = MasonX::ApacheHandler::WithCallbacks->new
                   { pkg_key => KEY,
                     cb_key  => 'exception',
                     cb      => \&exception
+                  },
+                  { pkg_key => KEY,
+                    cb_key  => 'count',
+                    cb      => \&count
                   },
                  ],
     pre_callbacks  => [\&upperit],

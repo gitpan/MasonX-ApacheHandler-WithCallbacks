@@ -1,6 +1,6 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.46 2003/06/17 22:46:19 david Exp $
+# $Id: WithCallbacks.pm,v 1.48 2003/06/29 20:20:59 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
@@ -27,7 +27,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.97';
+$VERSION = '0.98';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -213,7 +213,7 @@ sub request_args {
     # that's the way it'll be.
     my (@cbs, %cbhs);
     if ($self->{_cbs}) {
-        while (my ($k, $v) = each %$args) {
+        foreach my $k (keys %$args) {
             # Strip off the '.x' that an <input type="image" /> tag creates.
             (my $chk = $k) =~ s/\.x$//;
             if ((my $key = $chk) =~ s/_cb(\d?)$//) {
@@ -271,7 +271,7 @@ sub request_args {
                                              );
                 push @{$cbs[$priority]},
                   [ $cb, $cbhs{$class},
-                    [ $priority, $cb_key, $pkg_key, $chk, $v ]
+                    [ $priority, $cb_key, $pkg_key, $chk, $args->{$k} ]
                   ];
             }
         }
