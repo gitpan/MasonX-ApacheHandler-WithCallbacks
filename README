@@ -1,0 +1,39 @@
+MasonX/ApacheHandler/WithCallbacks version 0.10
+===============================================
+
+MasonX::ApacheHandler::WithCallbacks subclasses HTML::Mason::ApacheHandler in
+order to provide callbacks. Callbacks are code references provided to the
+new() constructor, and are triggered either for every request or by specially
+named keys in the Mason request arguments. The callbacks are executed at the
+beginning of a request, just before Mason creates a component stack and
+executes the components.
+
+The idea is to configure Mason to execute arbitrary code before executing any
+components. Doing so allows you to carry out logical processing of data
+submitted from a form, to affect the contents of the Mason request arguments
+(and thus the %ARGS hash in components), and even to redirect or abort the
+request before Mason handles it.
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+DEPENDENCIES
+
+This module requires these other modules and libraries:
+
+  HTML::Mason 1.10
+  mod_perl 1.22
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2003 David Wheeler
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. 
+
