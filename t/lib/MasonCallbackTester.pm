@@ -1,6 +1,6 @@
 package MasonCallbackTester;
 
-# $Id: MasonCallbackTester.pm,v 1.8 2003/02/14 22:43:02 david Exp $
+# $Id: MasonCallbackTester.pm,v 1.12 2003/04/30 06:05:23 david Exp $
 
 use strict;
 use MasonX::ApacheHandler::WithCallbacks;
@@ -70,6 +70,12 @@ sub chk_pkg_key {
     $args->{result} .= $cbh->pkg_key;
 }
 
+sub chk_class_key {
+    my $cbh = shift;
+    my $args = $cbh->request_args;
+    $args->{result} .= $cbh->class_key;
+}
+
 sub chk_trig_key {
     my $cbh = shift;
     my $args = $cbh->request_args;
@@ -101,17 +107,67 @@ sub exception {
     }
 }
 
+my $server = Apache->server;
+my $cfg = $server->dir_config;
+
+my %params = ( comp_root => $cfg->{MasonCompRoot},
+               data_dir => $cfg->{MasonDataDir},
+             );
+
+my %cb_config = ( pkg_key => KEY,
+                  cb_key  => 'testing',
+                  cb      => sub {}
+                );
+
+my %tests = ( '/bad_key' => sub {
+                  my %c = %cb_config;
+                  $c{cb_key} = ''; # Ooops.
+                  MasonX::ApacheHandler::WithCallbacks->new
+                      ( %params, callbacks => [\%c] );
+              },
+
+              '/bad_priority' => sub {
+                  my %c = %cb_config;
+                  $c{priority} = 'foo'; # Ooops.
+                  MasonX::ApacheHandler::WithCallbacks->new
+                      ( %params, callbacks => [\%c] );
+              },
+
+              '/bad_coderef' => sub {
+                  my %c = %cb_config;
+                  $c{cb_key} = 'coderef';
+                  $c{cb} = 'bogus'; # Ooops.
+                  MasonX::ApacheHandler::WithCallbacks->new
+                      ( %params, callbacks => [\%c] );
+              },
+
+              '/used_key' => sub {
+                  my %c = my %b = %cb_config;
+                  $c{cb_key} = $b{cb_key} = 'my_key'; # Ooops.
+                  MasonX::ApacheHandler::WithCallbacks->new
+                      ( %params, callbacks => [\%c, \%b] );
+              },
+
+              '/global_coderef' => sub {
+                  MasonX::ApacheHandler::WithCallbacks->new
+                      ( %params, pre_callbacks => ['foo'] );
+              },
+
+              '/no_cbs' => sub {
+                  MasonX::ApacheHandler::WithCallbacks->new
+                      ( %params );
+              },
+            );
+
+
 #{ cb => $cb,
 #  cb_key => $cb_key,
 #  priority => $priority,
 #  pkg_key => $pkg_key
 #}
 
-my $server = Apache->server;
-my $cfg = $server->dir_config;
 my $ah = MasonX::ApacheHandler::WithCallbacks->new
-  ( comp_root => $cfg->{MasonCompRoot},
-    data_dir => $cfg->{MasonDataDir},
+  ( %params,
     callbacks => [{ pkg_key => KEY,
                     cb_key  => 'simple',
                     cb      => \&simple
@@ -168,6 +224,18 @@ my $ah = MasonX::ApacheHandler::WithCallbacks->new
                     cb_key  => 'pkg_key3',
                     cb      => \&chk_pkg_key
                   },
+                  { pkg_key => KEY . '1',
+                    cb_key  => 'class_key1',
+                    cb      => \&chk_class_key
+                  },
+                  { pkg_key => KEY . '2',
+                    cb_key  => 'class_key2',
+                    cb      => \&chk_class_key
+                  },
+                  { pkg_key => KEY . '3',
+                    cb_key  => 'class_key3',
+                    cb      => \&chk_class_key
+                  },
                   { pkg_key => KEY,
                     cb_key  => 'trig_key1',
                     cb      => \&chk_trig_key
@@ -185,11 +253,16 @@ my $ah = MasonX::ApacheHandler::WithCallbacks->new
                     cb      => \&exception
                   },
                  ],
-    pre_callbacks => [\&upperit],
+    pre_callbacks  => [\&upperit],
     post_callbacks => [\&upperit]
   );
 
-sub handler { $ah->handle_request(@_)} ;
+sub handler {
+    if (my $code = $tests{$_[0]->uri}) {
+        return $code->(@_)
+    }
+    return $ah->handle_request(@_);
+}
 
 1;
 

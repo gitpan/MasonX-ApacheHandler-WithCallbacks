@@ -57,7 +57,7 @@ sub make_confs {
 sub make_data_dir {
     # Create the data directory if it doesn't exist.
     my $data_dir = catdir('t', 'data');
-    mkdir $data_dir or die "Can't make dir '$data_dir': $!\n"
+    mkdir $data_dir, 0777 or die "Can't make dir '$data_dir': $!\n"
       unless -d $data_dir;
 
     # Allow anyone to write files to the data directory.

@@ -1,5 +1,16 @@
 Revision history for Perl extension MasonX::ApacheHandler::WithCallbacks.
 
+0.95  Thu May  1 05:36:38 2003
+      - Changed MasonX::CallbackHandle to MasonX::CallbackHandler to
+        reflect its job as a subclassable callback handler.
+      - Added support for object-oriented callbacks. Callback classes can
+        be created to inherit from MasonX::CallbackHandler. They have their
+        own class keys, and the callbacks are named for the callback methods,
+        which are themselves identified by attributes. This is a much bigger
+        addition than it sounds like here. Read the MasonX::CallbackHandler
+        documentation for all the details.
+      - Many spelling errors corrected thanks to Scott Lanning.
+
 0.91  Fri Feb 14 22:45:10 2003
       - Fixed POD typos.
       - Added note about testing callbacks to documentation.

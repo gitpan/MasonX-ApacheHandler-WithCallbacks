@@ -1,12 +1,11 @@
 package MasonX::ApacheHandler::WithCallbacks;
 
-# $Id: WithCallbacks.pm,v 1.26 2003/02/14 22:49:07 david Exp $
+# $Id: WithCallbacks.pm,v 1.37 2003/05/01 05:34:00 david Exp $
 
 use strict;
 use HTML::Mason qw(1.10);
 use HTML::Mason::ApacheHandler ();
 use HTML::Mason::Exceptions ();
-use MasonX::CallbackHandle;
 use Apache::Constants qw(HTTP_OK);
 use Params::Validate ();
 
@@ -28,7 +27,7 @@ use HTML::Mason::MethodMaker( read_only => [qw(default_priority
 use vars qw($VERSION @ISA);
 @ISA = qw(HTML::Mason::ApacheHandler);
 
-$VERSION = '0.91';
+$VERSION = '0.95';
 
 Params::Validate::validation_options
   ( on_fail => sub { HTML::Mason::Exception::Params->throw( join '', @_ ) } );
@@ -71,11 +70,33 @@ __PACKAGE__->valid_params
       descr     => 'Callbacks to be executed after argument callbacks'
     },
 
+    cb_classes =>
+    { type      => Params::Validate::ARRAYREF | Params::Validate::SCALAR,
+      parse     => 'list',
+      callbacks => { 'valid cb_classes' => sub { ref $_[0] eq 'ARRAY'
+                                                   || $_[0] eq 'ALL' }
+                   },
+      optional  => 1,
+      descr     => 'List of calback classes from which to load callbacks'
+    },
+
   );
+
+BEGIN {
+    require MasonX::CallbackHandler;
+    MasonX::CallbackHandler::_find_names();
+}
 
 sub new {
     my $class = shift;
     my $self = $class->SUPER::new(@_);
+
+    # Grab any class callback specifications.
+    @{$self}{qw(_cbs _pre _post)} =
+      MasonX::CallbackHandler->_load_classes($self->{cb_classes})
+      if $self->{cb_classes};
+
+    # Process argument-triggered callback specs.
     if (my $cb_specs = delete $self->{callbacks}) {
         my %cbs;
         foreach my $spec (@$cb_specs) {
@@ -107,13 +128,12 @@ sub new {
             HTML::Mason::Exception::Params->throw
               ( error => "Callback key '$spec->{cb_key}' already used by " .
                 "package key '$spec->{pkg_key}'"
-              ) if $cbs{$spec->{pkg_key}}->{$spec->{cb_key}};
+              ) if $self->{_cbs}{$spec->{pkg_key}}->{$spec->{cb_key}};
 
             # Set it up.
-            $cbs{$spec->{pkg_key}}->{$spec->{cb_key}} =
+            $self->{_cbs}{$spec->{pkg_key}}->{$spec->{cb_key}} =
               { cb => $spec->{cb}, priority => $spec->{priority} };
         }
-        $self->{_cbs} = \%cbs;
     }
 
     # Now validate and store any global callbacks.
@@ -121,11 +141,15 @@ sub new {
         if (my $cbs = delete $self->{$type . '_callbacks'}) {
             my @gcbs;
             foreach my $cb (@$cbs) {
+                # Make it an array unless MasonX::CallbackHandler has already
+                # done so.
+                $cb = [$cb, 'MasonX::CallbackHandler']
+                  unless ref $cb eq 'ARRAY';
                 # Make sure that we have a code reference.
                 HTML::Mason::Exception::Params->throw
                   ( error => "Global $type callback not a code reference" )
-                  unless ref $cb eq 'CODE';
-                push @gcbs, [$cb];
+                  unless ref $cb->[0] eq 'CODE';
+                push @gcbs, $cb;
             }
             # Keep 'em.
             $self->{"_$type"} = \@gcbs;
@@ -133,10 +157,12 @@ sub new {
     }
 
     # Warn 'em if they're not using any callbacks.
-    unless ($self->{_cbs} or $self->{_pre} or $self->{_post}) {
-        warn "You didn't specify any callbacks. If you're not going" .
+    unless ($self->{_cbs} or $self->{_pre} or $self->{_post}
+            or $Apache::Server::Starting) {
+        require Carp;
+        Carp::carp("You didn't specify any callbacks. If you're not going " .
           "to use callbacks,\nyou might as well just use " .
-          "HTML::Mason::ApacheHandler.\n";
+          "HTML::Mason::ApacheHandler.\n");
     }
 
     # Let 'em have it.
@@ -161,7 +187,7 @@ sub request_args {
     # hash. In short, the use of arrays is cleaner, easier to read and
     # maintain, and almost always just as fast or faster than using hashes. So
     # that's the way it'll be.
-    my @cbs;
+    my (@cbs, %cbhs);
     if ($self->{_cbs}) {
         while (my ($k, $v) = each %$args) {
             # Strip off the '.x' that an <input type="image" /> tag creates.
@@ -186,36 +212,62 @@ sub request_args {
                 next unless $pkg_key;
 
                 # Find the callback.
-                my $cb = $self->{_cbs}{$pkg_key}{$cb_key}{cb} or
+                my $cb;
+                my $class = $self->{_cbs}{$pkg_key} or
                   HTML::Mason::Exception::Callback::InvalidKey->throw
-                    ( error   => "No callback found for callback key '$chk'",
+                    ( error   => "No such callback package '$pkg_key'",
                       callback_key => $chk );
 
-                # Get the specified priority if none was included in the
-                # callback key.
-                $priority = $self->{_cbs}{$pkg_key}{$cb_key}{priority}
-                  unless $priority ne '';
+                if (ref $class) {
+                    # It's a functional callback. Grab it.
+                    $cb = $class->{$cb_key}{cb} or
+                      HTML::Mason::Exception::Callback::InvalidKey->throw
+                        ( error   => "No callback found for callback key '$chk'",
+                          callback_key => $chk );
+
+                    # Get the specified priority if none was included in the
+                    # callback key.
+                    $priority = $class->{$cb_key}{priority}
+                      unless $priority ne '';
+                    $class = 'MasonX::CallbackHandler';
+                } else {
+                    # It's a method callback. Get it from the class.
+                    $cb = $class->_get_callback($cb_key, \$priority) or
+                      HTML::Mason::Exception::Callback::InvalidKey->throw
+                        ( error   => "No callback found for callback key '$chk'",
+                          callback_key => $chk );
+                }
 
                 # Push the callback onto the stack, along with the parameters
-                # for the construction of the  MasonX::CallbackHandle object
+                # for the construction of the  MasonX::CallbackHandler object
                 # that will be passed to it.
-                push @{$cbs[$priority]}, [$cb, [ request_args => $args,
-                                                 apache_req   => $r,
-                                                 ah           => $self,
-                                                 priority     => $priority,
-                                                 cb_key       => $cb_key,
-                                                 pkg_key      => $pkg_key,
-                                                 trigger_key  => $chk,
-                                                 value        => $v
-                                               ]
-                                         ];
+                $cbhs{$class} ||= $class->new( request_args => $args,
+                                               apache_req   => $r,
+                                               ah           => $self,
+                                             );
+                push @{$cbs[$priority]},
+                  [ $cb, $cbhs{$class},
+                    [ $priority, $cb_key, $pkg_key, $chk, $v ]
+                  ];
             }
         }
     }
 
     # Put any pre and post callbacks onto the stack.
-    unshift @cbs, $self->{_pre} if $self->{_pre};
-    push @cbs, $self->{_post} if $self->{_post};
+    if ($self->{_pre} or $self->{_post}) {
+        my $params = [ request_args => $args,
+                       apache_req   => $r,
+                       ah           => $self ];
+        unshift @cbs,
+          [ map { [ $_->[0], $cbhs{$_} || $_->[1]->new(@$params), [] ] }
+            @{$self->{_pre}} ]
+          if $self->{_pre};
+
+        push @cbs,
+          [ map { [ $_->[0], $cbhs{$_} || $_->[1]->new(@$params), [] ] }
+            @{$self->{_post}} ]
+          if $self->{_post};
+    }
 
     # Now execute the callbacks.
     eval {
@@ -223,13 +275,10 @@ sub request_args {
             # Skip it if there are no callbacks for this priority.
             next unless $cb_list;
             foreach my $cb_data (@$cb_list) {
-                my ($cb, $cbh_params) = @$cb_data;
-                # Construct the callback handle object.
-                my $cbh = MasonX::CallbackHandle->new
-                  ($cbh_params ? @$cbh_params :
-                   ( request_args => $args,
-                     apache_req   => $r,
-                     ah           => $self ));
+                my ($cb, $cbh, $cbargs) = @$cb_data;
+                # Cheat! But this keeps them read-only for the client.
+                @{$cbh}{qw(priority cb_key pkg_key trigger_key value)} =
+                  @$cbargs;
                 # Execute the callback.
                 $cb->($cbh);
             }
@@ -274,7 +323,8 @@ __END__
 
 =head1 NAME
 
-MasonX::ApacheHandler::WithCallbacks - Execute code before Mason components
+MasonX::ApacheHandler::WithCallbacks - Functional and object-oriented Mason
+callback architecture
 
 =head1 SYNOPSIS
 
@@ -292,6 +342,18 @@ In F<httpd.conf>:
 
 =end comment
 
+In your Mason component:
+
+  % if (exists $ARGS{answer}) {
+        <p><b>Answer: <% $ARGS{answer} %></b></p>
+  % } else {
+  <form>
+  <p>Enter an epoch time: <input type="text" name="epoch_time" /><br />
+  <input type="submit" name="myCallbacker|calc_time_cb" value="Calculate" />
+  </p>
+  </form>
+  % }
+
 In F<handler.pl>:
 
   use strict;
@@ -305,8 +367,9 @@ In F<handler.pl>:
   }
 
   my $ah = MasonX::ApacheHandler::WithCallbacks->new
-    ( callbacks => [ { cb_key => calc_time,
-                       cb => \&calc_time } ]
+    ( callbacks => [ { cb_key  => calc_time,
+                       pkg_key => 'myCallbacker',
+                       cb      => \&calc_time } ]
     );
 
   sub handler {
@@ -314,43 +377,60 @@ In F<handler.pl>:
       $ah->handle_request($r);
   }
 
-In your component:
+Or, in a subclass of MasonX::CallbackHandler:
 
-  % if (exists $ARGS{answer}) {
-        <p><b>Answer: <% $ARGS{answer} %></b></p>
-  % } else {
-  <form>
-  <p>Enter an epoch time: <input type="text" name="epoch_time" /><br />
-  <input type="submit" name="myCallbacker|calc_time_cb" value="Calculate" />
-  </p>
-  </form>
-  % }
+  package MyApp::CallbackHandler;
+  use base qw(MasonX::CallbackHandler);
+  __PACKAGE__->register_subclass( class_key => 'myCallbacker' );
+
+  sub calc_time : Callback {
+      my $self = shift;
+      my $args = $self->request_args;
+      my $val = $cbh->value;
+      $args->{answer} = localtime($val || time);
+  }
+
+And then, in F<handler.pl>:
+
+  # Load order is important here!
+  use MyApp::CallbackHandler;
+  use MasonX::ApacheHandler::WithCallbacks;
+
+  my $ah = MasonX::ApacheHandler::WithCallbacks->new
+    ( cb_classes => [qw(myCallbacker)] );
+
+  sub handler {
+      my $r = shift;
+      $ah->handle_request($r);
+  }
 
 =begin comment
 
 =head1 ABSTRACT
 
 MasonX::ApacheHandler::WithCallbacks subclasses HTML::Mason::ApacheHandler in
-order to provide callbacks. Callbacks are code references executed at the
-beginning of a request, just before Mason creates and executes the request
-component stack.
+order to provide functional and object-oriented callbacks. Callbacks are
+executed at the beginning of a request, just before Mason creates and executes
+the request component stack.
 
 =end comment
 
 =head1 DESCRIPTION
 
 MasonX::ApacheHandler::WithCallbacks subclasses HTML::Mason::ApacheHandler in
-order to provide callbacks. Callbacks are code references provided to the
-C<new()> constructor, and are triggered either for every request or by
-specially named keys in the Mason request arguments. The callbacks are
-executed at the beginning of a request, just before Mason creates and executes
-the request component stack.
+order to provide a Mason callback system. Callbacks may be either code
+references provided to the C<new()> constructor, or methods defined in
+subclasses of MasonX::CallbackHandler. Callbacks are triggered either for
+every request or by specially named keys in the Mason request arguments, and
+all callbacks are executed at the beginning of a request, just before Mason
+creates and executes the request component stack.
 
-The idea is to configure Mason to execute arbitrary code before executing any
-components. Doing so allows you to carry out logical processing of data
-submitted from a form, to affect the contents of the Mason request arguments
-(and thus the C<%ARGS> hash in components), and even to redirect or abort the
-request before Mason handles it.
+The idea behind this module is to provide a sort of plugin architecture for
+Mason. Mason then executes code before executing any components. This approach
+allows you to carry out logical processing of data submitted from a form, to
+affect the contents of the Mason request arguments (and thus the C<%ARGS> hash
+in components), and even to redirect or abort the request before Mason handles
+it.
 
 =head1 JUSTIFICATION
 
@@ -363,33 +443,34 @@ think of offhand include:
 
 Most application logic handled in Mason components takes place in
 C<< <%init> >> blocks, often in the same component as presentation logic. By
-moving the application logic into subroutines in Perl modules and then
-directing Mason to execute those subroutines as callbacks, you obviously
-benefit from a cleaner separation of application logic and presentation.
+moving the application logic into Perl modules and then directing Mason to
+execute that code as callbacks, you obviously benefit from a cleaner
+separation of application logic and presentation.
 
-=item Wigitization
+=item Widgitization
 
 Thanks to their ability to preprocess arguments, callbacks enable developers
 to develop easier-to-use, more dynamic widgets that can then be used in any
-Mason components. For example, a widget that puts many related fields into a
-form (such as a date selection widget) can have its fields preprocessed by a
-callback (for example, to properly combine the fields into a unified date
+and all Mason component. For example, a widget that puts many related fields
+into a form (such as a date selection widget) can have its fields preprocessed
+by a callback (for example, to properly combine the fields into a unified date
 field) before the Mason component that responds to the form submission gets
-the data.
+the data. See L<MasonX::CallbackHandler|MasonX::CallbackHandler/"Subclassing
+Examples"> for an example solution for this very problem.
 
 =item Shared Memory
 
 Callbacks are just Perl subroutines in modules loaded at server startup time.
-Thus the memory they consume is all in the parent, and then shared by the
-Apache children. For code that executes frequently, this can be much less
-resource-intensive than code in Mason components, since components are loaded
-separately in each Apache child process (unless they're preloaded via the
-C<preloads> parameter to the HTML::Mason::Interp constructor).
+Thus the memory they consume is all in the Apache parent process, and shared
+by the child processes. For code that executes frequently, this can be much
+less resource-intensive than code in Mason components, since components are
+loaded separately in each Apache child process (unless they're preloaded via
+the C<preloads> parameter to the HTML::Mason::Interp constructor).
 
 =item Performance
 
-Since callbacks are executed before Mason creates a component stack and
-executes the components, they have the opportunity to short-circuit the Mason
+Since they're executed before Mason creates a component stack and executes the
+components, callbacks have the opportunity to short-circuit the Mason
 processing by doing something else. A good example is redirection. Often the
 application logic in callbacks does its thing and then redirects the user to a
 different page. Executing the redirection in a callback eliminates a lot of
@@ -405,8 +486,8 @@ to test your callback subroutines.
 
 =back
 
-And if those are enough reasons, then just consider this: Callbacks just I<way
-cool.>
+And if those aren't enough reasons, then just consider this: Callbacks just
+I<way cool.>
 
 =head1 USAGE
 
@@ -429,8 +510,8 @@ This field, when submitted to the Mason server, would trigger the callback
 associated with the "save" callback key in the "world" package. If such a
 callback hasn't been configured, then MasonX::ApacheHandler::WithCallbacks
 will throw a HTML::Mason::Exception::Callback::InvalidKey exception. Here's
-how to configure such a callback when constructing your
-MasonX::ApacheHandler::WithCallbacks object so that that doesn't hapen:
+how to configure a functional callback when constructing your
+MasonX::ApacheHandler::WithCallbacks object so that that doesn't happen:
 
   my $cbah = MasonX::ApacheHandler::WithCallbacks->new
     ( callbacks => [ { pkg_key => 'world',
@@ -438,36 +519,64 @@ MasonX::ApacheHandler::WithCallbacks object so that that doesn't hapen:
                        cb      => \&My::World::save } ] );
 
 With this configuration, the request argument created by the above HTML form
-field will trigger the exectution of the C<&My::World::save> subroutine.
+field will trigger the execution of the C<&My::World::save> subroutine.
 
-=head3 Callback Subroutines
+=head3 Functional Callback Subroutines
 
-The code references used for argument-triggered callbacks will be executed
-with a single argument, a MasonX::CallbackHandle object. Thus, a callback
-subroutine will generally look something like this:
+Functional callbacks use a code reference for argument-triggered callbacks,
+and MasonX::ApacheHandler::WithCallbacks executes them with a single argument,
+a MasonX::CallbackHandler object. Thus, a callback subroutine will generally
+look something like this:
 
   sub foo {
       my $cbh = shift;
       # Do stuff.
   }
 
-The MasonX::CallbackHandle object provides accessors to data relevant to the
+The MasonX::CallbackHandler object provides accessors to data relevant to the
 callback, including the callback key, the package key, and the request
 arguments. It also includes C<redirect()> and C<abort()> methods. See the
-L<MasonX::CallbackHandle|MasonX::CallbackHandle> documentation for all the
+L<MasonX::CallbackHandler|MasonX::CallbackHandler> documentation for all the
 goodies.
 
 Note that all callbacks are executed in a C<eval {}> block, so if any of your
 callback subroutines C<die>, MasonX::ApacheHandler::WithCallbacks will
 throw an HTML::Mason::Exception::Callback::Execution exception.
 
+=head3 Object-Oriented Callback Methods
+
+Object-oriented callback methods are defined in subclasses of
+MasonX::CallbackHandler. Unlike functional callbacks, they are not called with
+a MasonX::CallbackHandler object, but with an instantiation of the callback
+subclass. These classes inherit all the goodies provided by
+MasonX::CallbackHandler, so you can essentially use their instances exactly as
+you would use the MasonX::CallbackHandler object in functional callback
+subroutines. But because they're subclasses, you can add your own methods and
+attributes. See L<MasonX::CallbackHandler|MasonX::CallbackHandler> for all the
+gory details on subclassing, along with a few examples. Generally, callback
+methods will look like this:
+
+  sub foo : Callback {
+      my $self = shift;
+      # Do stuff.
+  }
+
+As with functional callback subroutines, method callbacks are executed in a
+C<eval {}> block, so the same caveats apply.
+
+B<Note:> It's important that you C<use> any and all MasonX::Callback
+subclasses I<before> you C<use MasonX::ApacheHandler::WithCallbacks>. This is
+to get around an issue with identifying the names of the callback methods in
+mod_perl. Read the comments in the MasonX::Callback source code if you're
+interested in learning more.
+
 =head3 The Package Key
 
 The use of the package key is a convenience so that a system with many
-callbacks can use callbacks with the same keys but in different packages. The
-idea is that the package key will uniquely identify the module in which each
-callback subroutine is found, but it doesn't necessarily have to be so. Use
-the package key any way you wish, or not at all:
+functional callbacks can use callbacks with the same keys but in different
+packages. The idea is that the package key will uniquely identify the module
+in which each callback subroutine is found, but it doesn't necessarily have to
+be so. Use the package key any way you wish, or not at all:
 
   my $cbah = MasonX::ApacheHandler::WithCallbacks->new
     ( callbacks => [ { cb_key  => 'save',
@@ -493,6 +602,33 @@ will then use the custom default:
 
   <input type="button" value="Save World" name="MyPkg|save_cb" />
 
+=head3 The Class Key
+
+The class key is essentially a synonym for the package key, but applies more
+directly to object-oriented callbacks. The difference is mainly that it
+corresponds to an actual class, and that all MasonX::CallbackHandler
+subclasses are I<required> to have a class key; it's not optional as it is
+with functional callbacks. The class key may be declared in your
+MasonX::CallbackHandler subclass like so:
+
+  package MyApp::CallbackHandler;
+  use base qw(MasonX::CallbackHandler);
+  __PACKAGE__->register_subclass( class_key => 'MyCBHandler' );
+
+The class key can also be declared by implementing a C<CLASS_KEY()> method,
+like so:
+
+  package MyApp::CallbackHandler;
+  use base qw(MasonX::CallbackHandler);
+  __PACKAGE__->register_subclass;
+  use constant class_key => 'MyCBHandler';
+
+If no class key is explicitly defined, MasonX::CallbackHandler will use the
+subclass name, instead. In any event, the C<register_callback()> method
+B<must> be called to register the subclass with MasonX::CallbackHandler. See
+the L<MasonX::CallbackHandler|MasonX::CallbackHandler/"Callback Class
+Declaration"> documentation for complete details.
+
 =head3 Priority
 
 Sometimes one callback is more important than another. For example, you might
@@ -503,7 +639,8 @@ course, unordered), you need a method of ensuring that the setup callback
 executes first.
 
 In such a case, you can set a higher priority level for the setup callback
-than for callbacks that depend on it:
+than for callbacks that depend on it. For functional callbacks, you can do it
+like this:
 
   my $cbah = MasonX::ApacheHandler::WithCallbacks->new
     ( callbacks        => [ { cb_key   => 'setup',
@@ -513,10 +650,23 @@ than for callbacks that depend on it:
                               cb       => \&save }
                           ] );
 
-In this example, the "setup" callback has been configured with a priority
+For object-oriented callbacks, you can define the priority right in the
+callback method declaration:
+
+  sub setup : Callback( priority => 3 ) {
+      my $self = shift;
+      # ...
+  }
+
+  sub save : Callback {
+      my $self = shift;
+      # ...
+  }
+
+In these examples, the "setup" callback has been configured with a priority
 level of "3". This ensures that it will always execute before the "save"
-callback, which has the default priority of "5". This is true regardless
-of the order of the fields in the corresponding HTML::Form:
+callback, which has the default priority of "5". This is true regardless of
+the order of the fields in the corresponding HTML::Form:
 
   <input type="button" value="Save World" name="DEFAULT|save_cb" />
   <input type="hidden" name="DEFAULT|setup_cb" value="1" />
@@ -527,7 +677,9 @@ field (and will generally be submitted by the browser in that order), the
 
 Although the "save" callback got the default priority of "5", this too can be
 customized to a different priority level via the C<default_priority> parameter
-to C<new()>. For example, this configuration:
+to C<new()> for functional callbacks and the C<default_priority> to the class
+declaration for object-oriented callbacks For example, this functional
+callback configuration:
 
   my $cbah = MasonX::ApacheHandler::WithCallbacks->new
     ( callbacks        => [ { cb_key   => 'setup',
@@ -538,17 +690,24 @@ to C<new()>. For example, this configuration:
                           ],
       default_priority => 2 );
 
-Will cause the "save" callback to always execute before the "setup" callback,
-since it's priority level will default to "2".
+And this MasonX::CallbackHandler subclass declaration:
 
-Conversely, the priority level can be overridden via the form submission field
+  package MyApp::CallbackHandler;
+  use base qw(MasonX::CallbackHandler);
+  __PACKAGE__->register_subclass( class_key => 'MyCBHandler',
+                                  default_priority => 2 );
+
+Will cause the "save" callback to always execute before the "setup" callback,
+since its priority level will default to "2".
+
+In addition, the priority level can be overridden via the form submission field
 itself by appending a priority level to the end of the callback field
 name. Hence, this example:
 
   <input type="button" value="Save World" name="DEFAULT|save_cb2" />
   <input type="hidden" name="DEFAULT|setup_cb" value="1" />
 
-causes the "save" callback to execute before the "setup" callback by
+Causes the "save" callback to execute before the "setup" callback by
 overriding the "save" callback's priority to level "2". Of course, any other
 form field that triggers the "save" callback without a priority override will
 still execute "save" at its configured level.
@@ -557,38 +716,60 @@ still execute "save" at its configured level.
 
 Request callbacks come in two separate flavors: those that execute before the
 argument-triggered callbacks, and those that execute after the
-argument-triggered callbacks. These may be specified via the C<pre_callbacks>
-and C<post_callbacks> parameters to C<new()>, respectively:
+argument-triggered callbacks. All of them execute before the Mason component
+stack executes. Functional request callbacks may be specified via the
+C<pre_callbacks> and C<post_callbacks> parameters to C<new()>, respectively:
 
   my $cbah = MasonX::ApacheHandler::WithCallbacks->new
     ( pre_callbacks  => [ \&translate, \&foobarate ],
       post_callbacks => [ \&escape, \&negate ] );
 
-In this example, the C<translate()> and C<foobarate()> subroutines will
-execute (in that order) before any argument-triggered callbacks are executed
-(none will be in this example, since none are specifed). Conversely, the
-C<escape()> and C<negate()> subroutines will be executed (in that order) after
-all argument-triggered callbacks have been executed. And regardless of what
-argument-triggered callbacks may be triggered, the request callbacks will
-always be executed for I<every> request.
+Object-oriented request callbacks may be declared via the C<PreCallback> and
+C<PostCallback> method attributes, like so:
+
+  sub translate : PreCallback { ... }
+  sub foobarate : PreCallback { ... }
+  sub escape : PostCallback { ... }
+  sub negate : PostCallback { ... }
+
+In these examples, the C<translate()> and C<foobarate()> subroutines or
+methods will execute (in that order) before any argument-triggered callbacks
+are executed (none will be in these examples, since none are specified).
+
+Conversely, the C<escape()> and C<negate()> subroutines or methods will be
+executed (in that order) after all argument-triggered callbacks have been
+executed. And regardless of what argument-triggered callbacks may be
+triggered, the request callbacks will always be executed for I<every> request.
 
 Although they may be used for different purposes, the C<pre_callbacks> and
-C<post_callbacks> callback code references expect the same argument as
-argument-triggered callbacks: a MasonX::CallbackHandleObject:
+C<post_callbacks> functional callback code references expect the same argument
+as argument-triggered functional callbacks: a MasonX::CallbackHandler object:
 
   sub foo {
       my $cbh = shift;
       # Do your business here.
   }
 
-Of course, the attributes of the MasonX::CallbackHandleObject object will be
-different than in argument-triggered callbacks. For example, the C<priority>,
-C<pkg_key>, and C<cb_key> attributes will naturaly be undefined.
+Similarly, object-oriented request callback methods will be passed an object
+of the class defined in the class key portion of the callback trigger --
+either an object of the class in which the callback is defined, or an object
+of a subclass:
 
-Like the argument-triggered callbacks, however, like the argument-triggered
-callbacks, request callbacks are executed in a C<eval {}> block, so if any of
-them C<die>s, an HTML::Mason::Exception::Callback::Execution exception will be
-thrown.
+  sub foo : PostCallback {
+      my $self = shift;
+      # ...
+  }
+
+Of course, the attributes of the MasonX::CallbackHandler or subclass object
+will be different than in argument-triggered callbacks. For example, the
+C<priority>, C<pkg_key>, and C<cb_key> attributes will naturally be
+undefined. It will, however, be the same instance of the object passed to all
+other functional callbacks -- or to all other class callbacks with the same
+class key -- in a single request.
+
+Like the argument-triggered callbacks, request callbacks are executed in a
+C<eval {}> block, so if any of them C<die>s, an
+HTML::Mason::Exception::Callback::Execution exception will be thrown.
 
 =head1 INTERFACE
 
@@ -602,9 +783,9 @@ constructor.
 
 =item C<callbacks>
 
-Argument-triggered callbacks are configured via the C<callbacks> parameter.
-This parameter is an array reference of hash references, and each hash
-reference specifies a single callback. The supported keys in the callback
+Argument-triggered functional callbacks are configured via the C<callbacks>
+parameter. This parameter is an array reference of hash references, and each
+hash reference specifies a single callback. The supported keys in the callback
 specification hashes are:
 
 =over 4
@@ -618,7 +799,9 @@ argument key, will trigger the execution of the callback.
 
 Required. A reference to the Perl subroutine that will be executed when the
 C<cb_key> has been found in a Mason request argument key. Each code reference
-should a single argument: a MasonX::CallbackHandle object.
+should expect a single argument: a MasonX::CallbackHandler object. The same
+instance of a MasonX::CallbackHandler object will be used for all functional
+callbacks in a single request.
 
 =item C<pkg_key>
 
@@ -631,44 +814,66 @@ C<default_pkg_key> parameter.
 =item C<priority>
 
 Optional. Indicates the level of priority of a callback. Some callbacks are
-more important than others, and should be executed before others.
-MasonX::ApacheHandler::WithCallbacks supports priority levels, ranging from
-"0" (highest priority) to "9" (lowest priority). The default priority may be
-set via the C<default_priority> parameter.
+more important than others, and should be executed before the others.
+MasonX::ApacheHandler::WithCallbacks supports priority levels ranging from
+"0" (highest priority) to "9" (lowest priority). The default priority for
+functional callbacks may be set via the C<default_priority> parameter.
 
 =back
 
 =item C<pre_callbacks>
 
 This parameter accepts an array reference of code references that should be
-executed for I<every> request I<before> any other callbacks. Each code
-reference should expect a single MasonX::CallbackHandle argument. Use
-pre-argument-triggered request callbacks when you want to do something with
-the arguments sumitted for every request, such as convert character sets.
+executed for I<every> request I<before> any other callbacks. They will be
+executed in the order in which they're listed in the array reference. Each
+code reference should expect a single MasonX::CallbackHandler argument. The
+same instance of a MasonX::CallbackHandler object will be used for all
+functional callbacks in a single request. Use pre-argument-triggered request
+callbacks when you want to do something with the arguments submitted for every
+request, such as convert character sets.
 
 =item C<post_callbacks>
 
 This parameter accepts an array reference of code references that should be
-executed for I<every> request I<after> all other callbacks have been
-called. Each code reference should expect a single MasonX::CallbackHandle
-argument. Use post-argument-triggered request callbacks when you want to do
-something with the arguments sumitted for every request, such as HTML-escape
-their values.
+executed for I<every> request I<after> all other callbacks have been called.
+They will be executed in the order in which they're listed in the array
+reference. Each code reference should expect a single MasonX::CallbackHandler
+argument. The same instance of a MasonX::CallbackHandler object will be used
+for all functional callbacks in a single request. Use post-argument-triggered
+request callbacks when you want to do something with the arguments submitted
+for every request, such as HTML-escape their values.
+
+=item C<cb_classes>
+
+An array reference listing the class keys of all of the
+MasonX::CallbackHandler subclasses containing callback methods that you want
+included in your MasonX::ApacheHandler::WithCallbacks object. Alternatively,
+the C<cb_classes> parameter may simply be the word "ALL", in which case I<all>
+MasonX::CallbackHandler subclasses will have their callback methods registered
+with your MasonX::ApacheHandler::WithCallbacks object. See the
+L<MasonX::CallbackHandler|MasonX::CallbackHandler> documentation for details
+on creating callback classes and methods.
+
+B<Note:> Be sure to C<use MasonX::ApacheHandler::WithCallbacks> I<only> after
+you've C<use>d all of the MasonX::CallbackHandler subclasses you need or else
+you won't be able to use their callback methods.
 
 =item C<default_priority>
 
-The priority level at which callbacks will be executed. This value will be
-used in each hash reference passed via the C<callbacks> parameter to C<new()>
-that lacks a C<priority> key. You may specify a default priority level within
-the range of "0" (highst priority) to "9" (lowest priority). If not specified,
-it defaults to "5".
+The priority level at which functional callbacks will be executed. Does not
+apply to object-oriented callbacks. This value will be used in each hash
+reference passed via the C<callbacks> parameter to C<new()> that lacks a
+C<priority> key. You may specify a default priority level within the range of
+"0" (highest priority) to "9" (lowest priority). If not specified, it defaults
+to "5".
 
 =item C<default_pkg_key>
 
-The default package key for callbacks. This value that will be used in each
-hash reference passed via the C<callbacks> parameter to C<new()> that lacks a
-C<pkg_key> key. It can be any string that evaluates to a true value, and
-defaults to "DEFAULT" if not specified.
+The default package key for functional callbacks. Does not apply to
+object-oriented callbacks. This value that will be used in each hash reference
+passed via the C<callbacks> parameter to C<new()> that lacks a C<pkg_key>
+key. It can be any string that evaluates to a true value, and defaults to
+"DEFAULT" if not specified.
 
 =back
 
@@ -681,7 +886,7 @@ read-only accessor methods of the same name. For example:
   my $default_priority = $cbah->default_priority;
   my $default_pkg_key = $cbah->default_pkg_key;
 
-=head1 ACKNOWLEDGEMENTS
+=head1 ACKNOWLEDGMENTS
 
 Garth Webb implemented the original callbacks in Bricolage, based on an idea
 he borrowed from Paul Lindner's work with Apache::ASP. My thanks to them both
@@ -698,24 +903,27 @@ L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=MasonX-ApacheHandler-WithCallbacks>.
 
 =item *
 
-Create object-oriented interface.
-
-=item *
-
 Figure out how to use F<httpd.conf> C<PerlSetVar> directives to pass callback
 specs to C<new()>.
 
 =item *
 
-Add some good real-world examples to the documentation.
+Add explicit support for testing -- perhaps by adding a fake class of some
+kind that does something different with C<redirect()> and C<abort()>?
+
+=item *
+
+Add post-Mason execution callbacks?
 
 =back
 
 =head1 SEE ALSO
 
-L<MasonX::CallbackHandle|MasonX::CallbackHandle> objects get passed as the
-sole argument to all callback code references, and offer access to data
-relevant to the callback.
+L<MasonX::CallbackHandler|MasonX::CallbackHandler> objects get passed as the
+sole argument to all functional callbacks, and offer access to data relevant
+to the callback. MasonX::CallbackHandler also defines the object-oriented
+callback interface, making its documentation a must-read for anyone who wishes
+to create callback classes and methods.
 
 This module works with L<HTML::Mason|HTML::Mason> by subclassing
 L<HTML::Mason::ApacheHandler|HTML::Mason::ApacheHandler>. Inspired by the
@@ -724,7 +932,7 @@ however a completely new code base with a rather different approach.
 
 =head1 AUTHOR
 
-David Wheeler <L<david@wheeler.net|"david@wheeler.net">>
+David Wheeler <david@wheeler.net>
 
 =head1 COPYRIGHT AND LICENSE
 
